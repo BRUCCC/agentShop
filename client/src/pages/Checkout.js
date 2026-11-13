@@ -54,10 +54,14 @@ export default function Checkout() {
       .then(async (loaded) => {
         setCart(loaded);
         if (!loaded.items.length) return;
+        if (loaded.lock?.quote) {
+          setQuote(loaded.lock.quote);
+          return;
+        }
         const priced = await api("/api/quotes", {
           method: "POST",
           body: JSON.stringify({
-            channel: loaded.channel,
+            channel: "human",
             items: loaded.items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
           }),
         });

@@ -8,107 +8,13 @@ const {
   createHandoff,
   checkout,
 } = require("./domain/cart");
+const { loadToolSkills, toolDefinitions, systemPrompt, orderPhrases } = require("./skills");
 
 const MAX_ROUNDS = 6;
-const ORDER_INTENT = /下单|下單|结账|結帳|结帐|付款|支付|买单|買單|提交订单|确认下单|確認下單|完成订单|完成下单|帮我下单|直接下单|现在下单|去结账|去付款|模拟付款|我要买下|帮我买下/;
-
-const SYSTEM_PROMPT = `你是 Agent-Ready 商店的店员，用简体中文回复。
-价格、库存、规格和评论只能来自工具结果，不能自己编。
-搜索默认交给工具，不要一次索取全部商品。
-P001 和 P002 都叫 Aero 无线蓝牙耳机，只能用商品 id 区分，不能互相替换。
-update_cart 只改购物车，不能下单，也不能当作已经付款。
-用户只说加入购物车、想看某件商品或询问价格时，禁止调用 place_order。
-只有用户这句明确要下单、结账或付款时，才能调用 place_order。
-create_handoff 只锁库存并给出确认链接，不下单。
-回复里写清商品 id 和工具返回的金额。不要复述 API key。`;
-
-const TOOLS = [
-  {
-    type: "function",
-    function: {
-      name: "search_products",
-      description: "按名称搜索商品。默认 8 笔，最多 20 笔。",
-      parameters: {
-        type: "object",
-        properties: {
-          q: { type: "string" },
-          brand: { type: "string" },
-          category: { type: "string" },
-          in_stock: { type: "boolean" },
-          limit: { type: "integer" },
-        },
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "get_product",
-      description: "按商品 id 查看规格、库存和全部评论。",
-      parameters: {
-        type: "object",
-        properties: { product_id: { type: "string" } },
-        required: ["product_id"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "quote",
-      description: "按商品 id 和数量报价，不锁库存，不改购物车。",
-      parameters: {
-        type: "object",
-        properties: {
-          channel: { type: "string", enum: ["human", "agent"] },
-          items: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                product_id: { type: "string" },
-                quantity: { type: "integer" },
-              },
-              required: ["product_id", "quantity"],
-            },
-          },
-        },
-        required: ["items"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "update_cart",
-      description: "更新 agent 购物车。quantity 大于 0 是设置数量，0 是删除。不会下单。",
-      parameters: {
-        type: "object",
-        properties: {
-          product_id: { type: "string" },
-          quantity: { type: "integer" },
-        },
-        required: ["product_id", "quantity"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "create_handoff",
-      description: "为当前 agent 购物车锁库存 24 小时，返回确认页链接。不下单。",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "place_order",
-      description: "结算当前 agent 购物车。仅当用户这句明确要求下单时调用。",
-      parameters: { type: "object", properties: {} },
-    },
-  },
-];
+const skills = loadToolSkills();
+const TOOLS = toolDefinitions(skills);
+const SYSTEM_PROMPT = systemPrompt(skills);
+const ORDER_PHRASES = orderPhrases(skills);
 
 function fail(status, code, message) {
   const error = new Error(message);
@@ -175,11 +81,13 @@ function toolError(error) {
   };
 }
 
-function ensureAgentCart(state) {
+function wantsOrder(text) {
+  return ORDER_PHRASES.some((phrase) => text.includes(phrase));
+}
+
+function ensureOpenCart(state) {
   const row = state.cartId ? getCartRow(state.cartId) : null;
-  if (!row || row.channel !== "agent" || row.status !== "open") {
-    state.cartId = createCart("agent").id;
-  }
+  if (!row || row.status !== "open") state.cartId = createCart("human").id;
   return state.cartId;
 }
 
@@ -217,7 +125,7 @@ function runTool(name, args, state, userText) {
       return toolError({ code: "VALIDATION", message: "数量必须是非负整数" });
     }
     try {
-      const cart = setItem(ensureAgentCart(state), args.product_id, quantity);
+      const cart = setItem(ensureOpenCart(state), args.product_id, quantity);
       state.changed = true;
       return cart;
     } catch (error) {
@@ -226,7 +134,7 @@ function runTool(name, args, state, userText) {
   }
   if (name === "create_handoff") {
     try {
-      const handoff = createHandoff(ensureAgentCart(state));
+      const handoff = createHandoff(ensureOpenCart(state), "agent");
       state.changed = true;
       return handoff;
     } catch (error) {
@@ -234,13 +142,13 @@ function runTool(name, args, state, userText) {
     }
   }
   if (name === "place_order") {
-    if (!ORDER_INTENT.test(userText)) {
+    if (!wantsOrder(userText)) {
       return toolError({ code: "VALIDATION", message: "用户没有明确要求下单，不能下单" });
     }
     try {
-      const order = checkout(ensureAgentCart(state));
+      const order = checkout(ensureOpenCart(state), "agent");
       state.changed = true;
-      state.cartId = null;
+      state.ordered = true;
       return order;
     } catch (error) {
       return toolError(error);
@@ -276,12 +184,14 @@ function hideKey(text, apiKey) {
   return text.split(apiKey).join("［已隐藏］");
 }
 
-async function chat({ apiBase, apiKey, model, cartId, messages }) {
+async function chat({ apiKey, cartId, messages }) {
   if (!apiKey || !String(apiKey).trim()) fail(400, "MODEL_UNAVAILABLE", "没有填写 API key，不能调用模型");
-  if (!model || !String(model).trim()) fail(400, "VALIDATION", "需要填写模型名称");
+  const apiBase = process.env.SHOP_MODEL_BASE;
+  const model = process.env.SHOP_MODEL;
+  if (!apiBase || !model) fail(500, "MODEL_UNAVAILABLE", "服务还没有配置模型");
   const url = endpointFor(apiBase);
   const userText = latestUserText(messages);
-  const state = { cartId: cartId || null, changed: false };
+  const state = { cartId: cartId || null, changed: false, ordered: false };
   const transcript = [{ role: "system", content: SYSTEM_PROMPT }, ...normalizeMessages(messages)];
 
   let reply = "";
@@ -311,9 +221,10 @@ async function chat({ apiBase, apiKey, model, cartId, messages }) {
   if (!reply) reply = "这一步没有完成，请换个说法再试一次。";
   return {
     reply: hideKey(reply, String(apiKey)),
-    cart_id: state.cartId,
+    cart_id: state.ordered ? null : state.cartId,
     changed: state.changed,
+    ordered: state.ordered,
   };
 }
 
-module.exports = { chat, ORDER_INTENT };
+module.exports = { chat, wantsOrder };

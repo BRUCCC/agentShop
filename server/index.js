@@ -1,3 +1,4 @@
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const webpack = require("webpack");
@@ -8,6 +9,25 @@ const { catalog, searchProducts, findProduct, detailItem } = require("../src/dom
 const { heldQuantities, soldQuantities, releaseExpired } = require("../src/db");
 const { createCart, getCart, getCartRow, setItem, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
 const { chat } = require("../src/chat");
+
+function loadLocalEnv() {
+  const file = path.join(__dirname, "../.env");
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const splitAt = trimmed.indexOf("=");
+    if (splitAt === -1) continue;
+    const key = trimmed.slice(0, splitAt).trim();
+    let value = trimmed.slice(splitAt + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = value;
+  }
+}
+
+loadLocalEnv();
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -130,13 +150,13 @@ app.get("/api/handoffs/:token", (req, res) => {
 app.post("/api/chat", async (req, res) => {
   try {
     const result = await chat({
-      apiBase: req.body?.api_base,
       apiKey: req.body?.api_key,
-      model: req.body?.model,
-      cartId: req.body?.cart_id,
+      cartId: readCookie(req, "cart_id"),
       messages: req.body?.messages,
     });
-    res.json(result);
+    if (result.ordered) clearCartCookie(res);
+    else if (result.cart_id) setCartCookie(res, result.cart_id);
+    res.json({ reply: result.reply, changed: result.changed });
   } catch (error) {
     sendError(res, error.status || 500, error.code || "MODEL_UNAVAILABLE", error.message);
   }

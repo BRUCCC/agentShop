@@ -96,6 +96,8 @@ function getCart(id) {
   });
   const count = items.reduce((sum, item) => sum + item.quantity, 0);
   const stickerTotal = items.reduce((sum, item) => sum + item.line_total, 0);
+  const holds = activeHolds(cart.id);
+  const locked = holds.length && holdsMatch({ items }, holds);
   return {
     id: cart.id,
     channel: cart.channel,
@@ -103,6 +105,13 @@ function getCart(id) {
     count,
     sticker_total: stickerTotal,
     items,
+    lock: locked
+      ? {
+          expires_at: holds[0].expires_at,
+          url: cart.handoff_token ? `/checkout/${cart.handoff_token}` : null,
+          quote: JSON.parse(holds[0].quote_snapshot),
+        }
+      : null,
   };
 }
 
@@ -213,7 +222,7 @@ function insertOrder(cartId, channel, priced) {
   return orderId;
 }
 
-function checkout(cartId) {
+function checkout(cartId, channel) {
   const existing = db.prepare("SELECT * FROM orders WHERE cart_id = ?").get(cartId);
   if (existing) return orderPayload(existing.id);
 
@@ -240,7 +249,9 @@ function checkout(cartId) {
       fail(409, "OUT_OF_STOCK", `${blocked.map((item) => item.name).join("、")} 现在不能购买`);
     }
   }
-  const priced = locked || priceOrder(fresh.items, fresh.channel);
+  const requested = channel === "agent" ? "agent" : "human";
+  const priced = locked || priceOrder(fresh.items, requested);
+  fresh.channel = locked ? locked.channel : requested;
 
   db.exec("BEGIN");
   try {
@@ -256,7 +267,7 @@ function checkout(cartId) {
   }
 }
 
-function createHandoff(cartId) {
+function createHandoff(cartId, channel = "agent") {
   const cart = getCart(cartId);
   if (!cart) fail(404, "CART_NOT_FOUND", "购物车不存在");
   if (cart.status !== "open") fail(409, "VALIDATION", "这个购物车已经结账");
@@ -271,7 +282,7 @@ function createHandoff(cartId) {
     fail(409, "OUT_OF_STOCK", `${shortages.map((item) => item.name).join("、")} 现在不能购买`);
   }
 
-  const priced = priceOrder(cart.items, cart.channel);
+  const priced = priceOrder(cart.items, channel === "human" ? "human" : "agent");
   const snapshot = JSON.stringify(priced);
   const reservedAt = nowIso();
   const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();

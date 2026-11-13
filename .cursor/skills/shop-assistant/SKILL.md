@@ -16,16 +16,20 @@ disable-model-invocation: true
 
 ## 怎么做
 
-服务根地址是 `http://localhost:3000`。金额只相信接口返回值。
+服务根地址是 `http://localhost:3000`。金额只相信接口返回值。购物车只有一辆，用浏览器 cookie 里的 `cart_id`。不要另建一辆给 agent。
 
-1. 搜索：`GET /api/products?q=&limit=`。`limit` 默认 8，最大 20。不要省略 limit 去要全部商品。
-2. 规格和库存：`GET /api/products/{id}`。同名商品用 id 区分，P001 和 P002 不能互换。
-3. 报价：`POST /api/quotes`，正文是 `{ "channel": "agent", "items": [{ "product_id": "P001", "quantity": 1 }] }`。报价不锁库存。
-4. 建车：`POST /api/carts`，正文 `{ "channel": "agent" }`。
-5. 改车：`PUT /api/carts/{id}/items`，正文 `{ "product_id": "P001", "quantity": 1 }`。数量 0 是删除。这一步不下单。
-6. 交接：`POST /api/carts/{id}/handoff`。返回的 `url` 是确认页。预留带 `reserved_at` 和 `expires_at`，`expires_at` 是开始时间加 24 小时。这一步不下单。
-7. 下单：`POST /api/carts/{id}/checkout`。只有用户明确要下单时才调用。
-8. 对话栏顶部的 API 和 API key 由用户提供。不要把密钥写进仓库或回复里。
+具体动作看这些 skill：
+
+1. `shop-search`：搜索，默认 8 笔，最多 20 笔。
+2. `shop-product`：按 id 看规格和库存。P001 和 P002 不能互换。
+3. `shop-quote`：报价。不锁库存。
+4. `shop-update-cart`：改这辆车。数量 0 是删除。不下单。
+5. `shop-handoff`：锁库存 24 小时并给出确认链接。不下单。
+6. `shop-place-order`：只有用户明确要下单时才下单。
+
+页面上的 `POST /api/carts` 使用 `{ "channel": "human" }`，只是在还没有车时创建这一辆。对话栏改的是 cookie 里的同一辆。
+
+对话栏顶部只由用户提供 API key。模型地址和模型名称在服务端 `.env`，不要写进页面、仓库或回复。
 
 ## 不要做
 
@@ -40,3 +44,4 @@ disable-model-invocation: true
 | --- | --- | --- | --- |
 | v0 草稿 | 2026-11-13 | 按澄清写成规则，接口还未实现 | 0 |
 | v1 | 2026-11-13 | 写上已经实现的 JSON 调用步骤 | 1 |
+| v2 | 2026-11-13 | 改成同一辆购物车，工具拆到各自的 skill | 2 |
