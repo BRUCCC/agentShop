@@ -2,7 +2,7 @@
 
 来源：[Sr. Frontend Engineer Home Quiz](https://shepherdtech.notion.site/Sr-Frontend-Engineer-Home-Quiz-2a9a4b7afc888042ac89dd891ab6228a)
 
-以下为页面中与作业方式、缴交物、面试相关的原文，未改写。产品需求见 `产品相关/产品需求.md`。
+以下为页面中与作业方式、缴交物、面试相关的原文，未改写。产品需求见 `product/product-requirements.md`。
 
 ## 作業說明
 

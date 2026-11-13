@@ -1,0 +1,19 @@
+# 草稿。接入真实测试后，删掉占位步骤，改成运行价格测试的命令。
+# 约束：价格计算只有一份实现，网页和 agent 接口共用；测试只覆盖这一份。
+
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  price:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 待接入价格测试
+        run: |
+          echo "占位：这里应运行共用价格计算的测试"
+          echo "不要为网页和 agent 接口各写一套价格断言"
