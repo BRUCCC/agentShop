@@ -100,6 +100,15 @@ button:disabled { background: #bdbdbd; cursor: not-allowed; }
 }
 .crumb, .meta { color: #777; font-size: 13px; }
 .list-head { display: flex; justify-content: space-between; align-items: baseline; }
+.offer {
+  background: #fff;
+  border: 1px solid #f0d7a8;
+  color: #7a4b00;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+  font-size: 14px;
+}
+.sidebar .offer { margin: 0; }
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

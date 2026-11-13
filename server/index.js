@@ -5,6 +5,7 @@ const webpack = require("webpack");
 const webpackDevMiddleware = require("webpack-dev-middleware");
 const webpackHotMiddleware = require("webpack-hot-middleware");
 const config = require("../webpack.config");
+const { offerRules, offerForLines } = require("../src/domain/pricing");
 const { catalog, searchProducts, findProduct, detailItem } = require("../src/domain/catalog");
 const { heldQuantities, soldQuantities, releaseExpired } = require("../src/db");
 const { createCart, getCart, getCartRow, setItem, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
@@ -68,6 +69,10 @@ function parseOffset(value) {
   return Math.floor(number);
 }
 
+app.get("/api/offers", (req, res) => {
+  res.json(offerRules());
+});
+
 app.get("/api/products", (req, res) => {
   const result = searchProducts({
     q: req.query.q,
@@ -94,7 +99,7 @@ app.get("/api/cart", (req, res) => {
   const id = readCookie(req, "cart_id");
   const row = id ? getCartRow(id) : null;
   if (!row || row.status !== "open") {
-    return res.json({ id: null, channel: "human", status: "open", count: 0, sticker_total: 0, items: [] });
+    return res.json({ id: null, channel: "human", status: "open", count: 0, sticker_total: 0, offers: offerForLines([]), items: [] });
   }
   res.json(getCart(id));
 });

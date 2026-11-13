@@ -8,9 +8,14 @@ export default function ProductList() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q") || "";
   const offset = Number(params.get("offset") || 0);
+  const [offers, setOffers] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [pendingId, setPendingId] = useState("");
+
+  useEffect(() => {
+    api("/api/offers").then(setOffers).catch(() => setOffers(null));
+  }, []);
 
   useEffect(() => {
     const query = new URLSearchParams();
@@ -53,6 +58,13 @@ export default function ProductList() {
   return (
     <section>
       <p className="crumb">首页 / 全部商品</p>
+      {offers ? (
+        <p className="offer">
+          折前小计满 {formatMoney(offers.discount_threshold)} 减 {formatMoney(offers.discount_amount)}。
+          满 {formatMoney(offers.shipping_threshold)} 免运费，未满运费 {formatMoney(offers.shipping_fee)}。
+          通过对话栏下单，满减后再享 {offers.agent_percent} 折。
+        </p>
+      ) : null}
       <div className="list-head">
         <h1>{q ? `搜索「${q}」` : "全部商品"}</h1>
         <p>{data ? `共 ${data.total} 件，按推荐分数排序` : "正在读取商品"}</p>

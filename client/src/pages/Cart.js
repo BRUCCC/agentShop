@@ -59,7 +59,13 @@ export default function Cart() {
       {cart.items.length ? (
         <div className="summary">
           <p>标价合计 {formatMoney(cart.sticker_total)}</p>
-          <p className="meta">这里只加总标价，还没有满额减、运费和折扣。</p>
+          {cart.offers ? (
+            <p className="offer">
+              {cart.offers.discount_qualified
+                ? `已满 ${formatMoney(cart.offers.discount_threshold)}，可减 ${formatMoney(cart.offers.discount_amount)}`
+                : `差 ${formatMoney(cart.offers.discount_gap)} 可享折扣`}
+            </p>
+          ) : null}
           <Link className="button" to="/checkout">去结账</Link>
         </div>
       ) : null}

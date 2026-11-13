@@ -1,7 +1,7 @@
 const crypto = require("crypto");
 const { db } = require("../db");
 const { findProduct, availability } = require("./catalog");
-const { priceOrder } = require("./pricing");
+const { priceOrder, offerForLines } = require("./pricing");
 
 function nowIso() {
   return new Date().toISOString();
@@ -104,6 +104,7 @@ function getCart(id) {
     status: cart.status,
     count,
     sticker_total: stickerTotal,
+    offers: offerForLines(items),
     items,
     lock: locked
       ? {

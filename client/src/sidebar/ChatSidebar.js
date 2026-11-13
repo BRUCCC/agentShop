@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../api";
+import { api, formatMoney } from "../api";
 
 const STORAGE = {
   messages: "shop.chat.messages",
@@ -33,6 +33,7 @@ export default function ChatSidebar({ open }) {
     }
   });
   const [cartCount, setCartCount] = useState(0);
+  const [offers, setOffers] = useState(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -47,7 +48,10 @@ export default function ChatSidebar({ open }) {
       }
     }
     api("/api/cart")
-      .then((cart) => setCartCount(cart.count || 0))
+      .then((cart) => {
+        setCartCount(cart.count || 0);
+        setOffers(cart.offers || null);
+      })
       .catch(() => setCartCount(0));
   }, []);
 
@@ -98,6 +102,12 @@ export default function ChatSidebar({ open }) {
         />
       </label>
       <p className="meta">和页面是同一辆购物车，现有 {cartCount} 件。只说加入购物车时不会下单。</p>
+      {offers ? (
+        <p className="offer">
+          通过对话栏下单额外优惠：满减后的商品金额再享 {offers.agent_percent} 折，运费不参加。
+          {offers.agent_extra > 0 ? ` 这辆车还可再省 ${formatMoney(offers.agent_extra)}。` : ""}
+        </p>
+      ) : null}
       <div className="transcript">
         {messages.map((message, index) => (
           <p key={`${message.role}-${index}`} className={message.role === "user" ? "mine" : "reply"}>

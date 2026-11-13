@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { priceOrder } = require("./pricing");
+const { priceOrder, offerForLines } = require("./pricing");
 
 function order(unitPrice, quantity, channel) {
   return priceOrder(
@@ -36,6 +36,16 @@ test("价格为 0 仍按门槛收运费", () => {
   assert.equal(human.total, 100);
   assert.equal(agent.total, 100);
   assert.equal(agent.discount, 0);
+});
+
+test("购物车提示用同一套门槛", () => {
+  const below = offerForLines([{ product_id: "X", name: "样品", quantity: 1, unit_price: 680 }]);
+  assert.equal(below.discount_gap, 320);
+  assert.equal(below.discount_qualified, false);
+  const reached = offerForLines([{ product_id: "X", name: "样品", quantity: 1, unit_price: 1000 }]);
+  assert.equal(reached.discount_gap, 0);
+  assert.equal(reached.discount_qualified, true);
+  assert.equal(reached.agent_extra, 45);
 });
 
 test("同一组商品，agent 应付不超过 human", () => {
