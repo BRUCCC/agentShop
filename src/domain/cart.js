@@ -1,6 +1,7 @@
 const crypto = require("crypto");
 const { db } = require("../db");
 const { findProduct, availability } = require("./catalog");
+const { priceOrder } = require("./pricing");
 
 function nowIso() {
   return new Date().toISOString();
@@ -19,6 +20,35 @@ function heldQty(productId) {
     )
     .get(productId, nowIso());
   return Number(row.qty);
+}
+
+function soldQty(productId) {
+  const row = db
+    .prepare("SELECT COALESCE(SUM(quantity), 0) AS qty FROM order_items WHERE product_id = ?")
+    .get(productId);
+  return Number(row.qty);
+}
+
+function heldQtyExceptCart(productId, cartId) {
+  const row = db
+    .prepare(
+      `SELECT COALESCE(SUM(quantity), 0) AS qty
+       FROM reservations
+       WHERE product_id = ? AND status = 'held' AND expires_at > ? AND cart_id != ?`,
+    )
+    .get(productId, nowIso(), cartId);
+  return Number(row.qty);
+}
+
+function fail(status, code, message) {
+  const error = new Error(message);
+  error.status = status;
+  error.code = code;
+  throw error;
+}
+
+function releaseHolds(cartId) {
+  db.prepare("UPDATE reservations SET status = 'released' WHERE cart_id = ? AND status = 'held'").run(cartId);
 }
 
 function createCart(channel) {
@@ -53,7 +83,7 @@ function getCart(id) {
         missing: true,
       };
     }
-    const stock = availability(product, heldQty(product.id));
+    const stock = availability(product, heldQty(product.id), soldQty(product.id));
     return {
       product_id: product.id,
       name: product.name,
@@ -100,7 +130,7 @@ function setItem(cartId, productId, quantity) {
   if (quantity === 0) {
     db.prepare("DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?").run(cartId, productId);
   } else {
-    const stock = availability(product, heldQty(product.id));
+    const stock = availability(product, heldQtyExceptCart(product.id, cartId), soldQty(product.id));
     if (!stock.sellable) {
       const error = new Error(`${product.name} 现在不能购买`);
       error.status = 409;
@@ -118,8 +148,69 @@ function setItem(cartId, productId, quantity) {
        ON CONFLICT(cart_id, product_id) DO UPDATE SET quantity = excluded.quantity`,
     ).run(cartId, productId, quantity);
   }
+  releaseHolds(cartId);
   db.prepare("UPDATE carts SET updated_at = ? WHERE id = ?").run(nowIso(), cartId);
   return getCart(cartId);
+}
+
+function quoteProducts(channel, rawItems) {
+  if (channel !== "human" && channel !== "agent") fail(400, "VALIDATION", "渠道只能是 human 或 agent");
+  if (!Array.isArray(rawItems) || rawItems.length === 0) fail(400, "VALIDATION", "需要至少一件商品");
+  const lines = rawItems.map((item) => {
+    const product = findProduct(item?.product_id);
+    if (!product) fail(404, "PRODUCT_NOT_FOUND", "没有这个商品");
+    const quantity = Number(item.quantity);
+    if (!Number.isInteger(quantity) || quantity < 1) fail(400, "VALIDATION", "数量必须是正整数");
+    const stock = availability(product, heldQty(product.id), soldQty(product.id));
+    return {
+      product_id: product.id,
+      name: product.name,
+      quantity,
+      unit_price: product.price,
+      available: stock.available,
+      sellable: stock.sellable,
+    };
+  });
+  const priced = priceOrder(lines, channel);
+  priced.items = priced.items.map((line, index) => ({
+    ...line,
+    available: lines[index].available,
+    sellable: lines[index].sellable,
+  }));
+  return priced;
+}
+
+function activeHolds(cartId) {
+  return db
+    .prepare(
+      `SELECT * FROM reservations
+       WHERE cart_id = ? AND status = 'held' AND expires_at > ?
+       ORDER BY product_id`,
+    )
+    .all(cartId, nowIso());
+}
+
+function holdsMatch(cart, holds) {
+  if (holds.length !== cart.items.length) return false;
+  const quantities = new Map(holds.map((hold) => [hold.product_id, hold.quantity]));
+  return cart.items.every((item) => quantities.get(item.product_id) === item.quantity);
+}
+
+function insertOrder(cartId, channel, priced) {
+  const orderId = newId("order");
+  const createdAt = nowIso();
+  db.prepare(
+    `INSERT INTO orders (id, cart_id, channel, subtotal, discount, shipping_fee, total, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+  ).run(orderId, cartId, channel, priced.subtotal, priced.discount, priced.shipping_fee, priced.total, createdAt);
+  const insertItem = db.prepare(
+    `INSERT INTO order_items (order_id, product_id, name, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`,
+  );
+  for (const item of priced.items) {
+    insertItem.run(orderId, item.product_id, item.name, item.quantity, item.unit_price);
+  }
+  db.prepare("UPDATE carts SET status = 'ordered', updated_at = ? WHERE id = ?").run(createdAt, cartId);
+  return orderId;
 }
 
 function checkout(cartId) {
@@ -139,36 +230,135 @@ function checkout(cartId) {
     error.code = "VALIDATION";
     throw error;
   }
-  const blocked = cart.items.filter((item) => item.missing || !item.sellable || item.quantity > item.available);
-  if (blocked.length) {
-    const error = new Error(`${blocked.map((item) => item.name).join("、")} 现在不能购买`);
-    error.status = 409;
-    error.code = "OUT_OF_STOCK";
-    throw error;
+  const holds = activeHolds(cartId);
+  const locked = holds.length && holdsMatch(cart, holds) ? JSON.parse(holds[0].quote_snapshot) : null;
+  if (holds.length && !locked) releaseHolds(cartId);
+  const fresh = locked ? cart : getCart(cartId);
+  if (!locked) {
+    const blocked = fresh.items.filter((item) => item.missing || !item.sellable || item.quantity > item.available);
+    if (blocked.length) {
+      fail(409, "OUT_OF_STOCK", `${blocked.map((item) => item.name).join("、")} 现在不能购买`);
+    }
   }
+  const priced = locked || priceOrder(fresh.items, fresh.channel);
 
-  const orderId = newId("order");
-  const createdAt = nowIso();
-  const subtotal = cart.sticker_total;
   db.exec("BEGIN");
   try {
-    db.prepare(
-      `INSERT INTO orders (id, cart_id, channel, subtotal, discount, shipping_fee, total, created_at)
-       VALUES (?, ?, ?, ?, 0, 0, ?, ?)`,
-    ).run(orderId, cartId, cart.channel, subtotal, subtotal, createdAt);
-    const insertItem = db.prepare(
-      `INSERT INTO order_items (order_id, product_id, name, quantity, unit_price) VALUES (?, ?, ?, ?, ?)`,
+    const orderId = insertOrder(cartId, fresh.channel, priced);
+    if (locked) {
+      db.prepare("UPDATE reservations SET status = 'consumed' WHERE cart_id = ? AND status = 'held'").run(cartId);
+    }
+    db.exec("COMMIT");
+    return orderPayload(orderId);
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function createHandoff(cartId) {
+  const cart = getCart(cartId);
+  if (!cart) fail(404, "CART_NOT_FOUND", "购物车不存在");
+  if (cart.status !== "open") fail(409, "VALIDATION", "这个购物车已经结账");
+  if (!cart.items.length) fail(400, "VALIDATION", "购物车是空的");
+  const shortages = cart.items.filter((item) => {
+    if (item.missing) return true;
+    const product = findProduct(item.product_id);
+    const stock = availability(product, heldQtyExceptCart(product.id, cartId), soldQty(product.id));
+    return !stock.sellable || item.quantity > stock.available;
+  });
+  if (shortages.length) {
+    fail(409, "OUT_OF_STOCK", `${shortages.map((item) => item.name).join("、")} 现在不能购买`);
+  }
+
+  const priced = priceOrder(cart.items, cart.channel);
+  const snapshot = JSON.stringify(priced);
+  const reservedAt = nowIso();
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const token = getCartRow(cartId).handoff_token || crypto.randomBytes(16).toString("hex");
+  db.exec("BEGIN");
+  try {
+    releaseHolds(cartId);
+    const insert = db.prepare(
+      `INSERT INTO reservations
+        (id, cart_id, product_id, quantity, reserved_at, expires_at, status, quote_snapshot)
+       VALUES (?, ?, ?, ?, ?, ?, 'held', ?)`,
     );
     for (const item of cart.items) {
-      insertItem.run(orderId, item.product_id, item.name, item.quantity, item.unit_price);
+      insert.run(newId("hold"), cartId, item.product_id, item.quantity, reservedAt, expiresAt, snapshot);
     }
-    db.prepare("UPDATE carts SET status = 'ordered', updated_at = ? WHERE id = ?").run(createdAt, cartId);
+    db.prepare("UPDATE carts SET handoff_token = ?, updated_at = ? WHERE id = ?").run(token, reservedAt, cartId);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
     throw error;
   }
-  return orderPayload(orderId);
+  return {
+    token,
+    url: `/checkout/${token}`,
+    expires_at: expiresAt,
+    quote: priced,
+  };
+}
+
+function getHandoff(token) {
+  const cart = db.prepare("SELECT * FROM carts WHERE handoff_token = ?").get(token);
+  if (!cart) return null;
+  const order = db.prepare("SELECT id FROM orders WHERE cart_id = ?").get(cart.id);
+  if (order) {
+    return { token, cart_id: cart.id, channel: cart.channel, ordered: true, order: orderPayload(order.id) };
+  }
+  releaseExpiredHolds(cart.id);
+  const holds = activeHolds(cart.id);
+  const current = getCart(cart.id);
+  if (!current.items.length) {
+    return {
+      token,
+      cart_id: cart.id,
+      channel: cart.channel,
+      ordered: false,
+      expired: true,
+      quote: null,
+      shortages: [],
+    };
+  }
+  if (holds.length && holdsMatch(current, holds)) {
+    return {
+      token,
+      cart_id: cart.id,
+      channel: cart.channel,
+      ordered: false,
+      expired: false,
+      expires_at: holds[0].expires_at,
+      quote: JSON.parse(holds[0].quote_snapshot),
+      shortages: [],
+    };
+  }
+  const quote = priceOrder(current.items, current.channel);
+  const shortages = current.items
+    .filter((item) => item.missing || !item.sellable || item.quantity > item.available)
+    .map((item) => ({
+      product_id: item.product_id,
+      name: item.name,
+      requested: item.quantity,
+      available: item.available,
+    }));
+  return {
+    token,
+    cart_id: cart.id,
+    channel: cart.channel,
+    ordered: false,
+    expired: true,
+    quote,
+    shortages,
+  };
+}
+
+function releaseExpiredHolds(cartId) {
+  db.prepare(
+    `UPDATE reservations SET status = 'released'
+     WHERE cart_id = ? AND status = 'held' AND expires_at <= ?`,
+  ).run(cartId, nowIso());
 }
 
 function orderPayload(orderId) {
@@ -190,4 +380,14 @@ function orderPayload(orderId) {
   };
 }
 
-module.exports = { createCart, getCart, getCartRow, setItem, checkout, orderPayload };
+module.exports = {
+  createCart,
+  getCart,
+  getCartRow,
+  setItem,
+  quoteProducts,
+  createHandoff,
+  getHandoff,
+  checkout,
+  orderPayload,
+};

@@ -19,9 +19,9 @@
 
 ## 价格
 
-- [ ] 一份价格计算，网页和 agent 接口共用
-- [ ] 测试覆盖这份实现
-- [ ] GitHub Actions 跑这些测试
+- [x] 一份价格计算，网页和 agent 接口共用
+- [x] 测试覆盖这份实现
+- [x] GitHub Actions 跑这些测试
 
 ## 给人用的网页
 
@@ -38,15 +38,15 @@
 
 - [x] 商品读接口，标价来自 `data/products.json`
 - [x] 搜索商品
-- [ ] 查询规格和库存
-- [ ] 报价
+- [x] 查询规格和库存
+- [x] 报价
 - [x] 更新购物车
-- [ ] 交接链接，预留带 `reserved_at` 和 `expires_at`
-- [ ] `.cursor/skills/shop-assistant/SKILL.md` 写清调用方式：可以下单，但加入购物车本身不下单
+- [x] 交接链接，预留带 `reserved_at` 和 `expires_at`
+- [x] `.cursor/skills/shop-assistant/SKILL.md` 写清调用方式：可以下单，但加入购物车本身不下单
 
 ## 右侧对话栏
 
-- [ ] 商城页面右侧的侧边栏。顶部输入 API 和 API key。可以改购物车，也可以在用户明确要求时下单。不另做页面。
+- [x] 商城页面右侧的侧边栏。顶部输入 API 和 API key。可以改购物车，也可以在用户明确要求时下单。不另做页面。
 
 ## 提交材料
 

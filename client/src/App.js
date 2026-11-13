@@ -5,11 +5,13 @@ import ProductList from "./pages/ProductList";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
+import ChatSidebar from "./sidebar/ChatSidebar";
 
 export default function App() {
   const navigate = useNavigate();
   const [cartCount, setCartCount] = useState(0);
   const [query, setQuery] = useState("");
+  const [chatOpen, setChatOpen] = useState(() => window.matchMedia("(min-width: 901px)").matches);
 
   useEffect(() => {
     api("/api/cart").then((cart) => setCartCount(cart.count || 0)).catch(() => setCartCount(0));
@@ -43,17 +45,24 @@ export default function App() {
             购物车
             <span>{cartCount}</span>
           </Link>
+          <button type="button" className="chat-toggle" onClick={() => setChatOpen((value) => !value)}>
+            对话
+          </button>
         </div>
       </header>
-      <main className="main">
-        <Routes>
-          <Route path="/" element={<ProductList />} />
-          <Route path="/products/:id" element={<ProductDetail />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/checkout" element={<Checkout />} />
-        </Routes>
-      </main>
-      <footer className="footer">标价来自商品目录。优惠和运费还没有接入。</footer>
+      <div className="shell">
+        <main className="main">
+          <Routes>
+            <Route path="/" element={<ProductList />} />
+            <Route path="/products/:id" element={<ProductDetail />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/checkout/:token" element={<Checkout />} />
+          </Routes>
+        </main>
+        <ChatSidebar open={chatOpen} />
+      </div>
+      <footer className="footer">标价来自商品目录。优惠和运费只出现在报价和确认页。</footer>
     </div>
   );
 }

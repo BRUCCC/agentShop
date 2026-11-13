@@ -5,8 +5,9 @@ const webpackDevMiddleware = require("webpack-dev-middleware");
 const webpackHotMiddleware = require("webpack-hot-middleware");
 const config = require("../webpack.config");
 const { catalog, searchProducts, findProduct, detailItem } = require("../src/domain/catalog");
-const { heldQuantities, releaseExpired } = require("../src/db");
-const { createCart, getCart, getCartRow, setItem, checkout, orderPayload } = require("../src/domain/cart");
+const { heldQuantities, soldQuantities, releaseExpired } = require("../src/db");
+const { createCart, getCart, getCartRow, setItem, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
+const { chat } = require("../src/chat");
 
 const PORT = Number(process.env.PORT) || 3000;
 const app = express();
@@ -30,8 +31,8 @@ function clearCartCookie(res) {
   res.setHeader("Set-Cookie", "cart_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
 }
 
-function heldLookup() {
-  const map = heldQuantities();
+function quantityLookup(load) {
+  const map = load();
   return (productId) => map.get(productId) || 0;
 }
 
@@ -55,7 +56,8 @@ app.get("/api/products", (req, res) => {
     inStock: req.query.in_stock === "1",
     limit: parseLimit(req.query.limit),
     offset: parseOffset(req.query.offset),
-    held: heldLookup(),
+    held: quantityLookup(heldQuantities),
+    sold: quantityLookup(soldQuantities),
   });
   res.json({ store: catalog().store, currency: catalog().currency, ...result });
 });
@@ -63,7 +65,9 @@ app.get("/api/products", (req, res) => {
 app.get("/api/products/:id", (req, res) => {
   const product = findProduct(req.params.id);
   if (!product) return sendError(res, 404, "PRODUCT_NOT_FOUND", "没有这个商品");
-  res.json(detailItem(product, heldLookup()(product.id)));
+  const held = quantityLookup(heldQuantities);
+  const sold = quantityLookup(soldQuantities);
+  res.json(detailItem(product, held(product.id), sold(product.id)));
 });
 
 app.get("/api/cart", (req, res) => {
@@ -98,6 +102,43 @@ app.put("/api/carts/:id/items", (req, res) => {
     res.json(setItem(req.params.id, productId, quantity));
   } catch (error) {
     sendError(res, error.status || 500, error.code || "VALIDATION", error.message);
+  }
+});
+
+app.post("/api/quotes", (req, res) => {
+  try {
+    res.json(quoteProducts(req.body?.channel, req.body?.items));
+  } catch (error) {
+    sendError(res, error.status || 500, error.code || "VALIDATION", error.message);
+  }
+});
+
+app.post("/api/carts/:id/handoff", (req, res) => {
+  try {
+    res.status(201).json(createHandoff(req.params.id));
+  } catch (error) {
+    sendError(res, error.status || 500, error.code || "VALIDATION", error.message);
+  }
+});
+
+app.get("/api/handoffs/:token", (req, res) => {
+  const handoff = getHandoff(req.params.token);
+  if (!handoff) return sendError(res, 404, "CART_NOT_FOUND", "交接链接不存在");
+  res.json(handoff);
+});
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const result = await chat({
+      apiBase: req.body?.api_base,
+      apiKey: req.body?.api_key,
+      model: req.body?.model,
+      cartId: req.body?.cart_id,
+      messages: req.body?.messages,
+    });
+    res.json(result);
+  } catch (error) {
+    sendError(res, error.status || 500, error.code || "MODEL_UNAVAILABLE", error.message);
   }
 });
 

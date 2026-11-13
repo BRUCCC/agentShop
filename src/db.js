@@ -57,6 +57,19 @@ db.exec(`
   );
 `);
 
+function soldQuantities() {
+  const rows = db
+    .prepare(
+      `SELECT product_id, SUM(quantity) AS qty
+       FROM order_items
+       GROUP BY product_id`,
+    )
+    .all();
+  const map = new Map();
+  for (const row of rows) map.set(row.product_id, Number(row.qty));
+  return map;
+}
+
 function heldQuantities() {
   const now = new Date().toISOString();
   const rows = db
@@ -79,4 +92,4 @@ function releaseExpired() {
   ).run(now);
 }
 
-module.exports = { db, heldQuantities, releaseExpired };
+module.exports = { db, heldQuantities, soldQuantities, releaseExpired };

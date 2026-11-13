@@ -41,16 +41,17 @@ function catalog() {
   return cached;
 }
 
-function availability(product, heldQty) {
-  const available = Math.max(0, product.catalogAvailable - heldQty);
+function availability(product, heldQty, soldQty) {
+  const onHand = product.stock < 0 ? 0 : Math.max(0, product.stock - soldQty);
+  const available = Math.max(0, onHand - heldQty);
   return {
-    stock: product.stock < 0 ? 0 : product.stock,
+    stock: onHand,
     available,
     sellable: product.stock > 0 && available > 0,
   };
 }
 
-function listItem(product, heldQty) {
+function listItem(product, heldQty, soldQty) {
   return {
     id: product.id,
     name: product.name,
@@ -60,13 +61,13 @@ function listItem(product, heldQty) {
     recommendation_score: product.recommendation_score,
     rating_avg: product.rating_avg,
     review_count: product.review_count,
-    ...availability(product, heldQty),
+    ...availability(product, heldQty, soldQty),
   };
 }
 
-function detailItem(product, heldQty) {
+function detailItem(product, heldQty, soldQty) {
   return {
-    ...listItem(product, heldQty),
+    ...listItem(product, heldQty, soldQty),
     description: product.description,
     specs: product.specs,
     reviews: product.reviews,
@@ -77,7 +78,7 @@ function findProduct(id) {
   return catalog().products.find((product) => product.id === id) || null;
 }
 
-function searchProducts({ q, brand, category, inStock, limit, offset, held }) {
+function searchProducts({ q, brand, category, inStock, limit, offset, held, sold }) {
   const query = (q || "").trim().toLowerCase();
   let items = catalog().products.filter((product) => {
     if (query && !product.name.toLowerCase().includes(query)) return false;
@@ -87,10 +88,10 @@ function searchProducts({ q, brand, category, inStock, limit, offset, held }) {
   });
   items.sort((a, b) => b.recommendation_score - a.recommendation_score || a.id.localeCompare(b.id));
   if (inStock) {
-    items = items.filter((product) => availability(product, held(product.id)).sellable);
+    items = items.filter((product) => availability(product, held(product.id), sold(product.id)).sellable);
   }
   const total = items.length;
-  const page = items.slice(offset, offset + limit).map((product) => listItem(product, held(product.id)));
+  const page = items.slice(offset, offset + limit).map((product) => listItem(product, held(product.id), sold(product.id)));
   return { total, limit, offset, items: page };
 }
 
