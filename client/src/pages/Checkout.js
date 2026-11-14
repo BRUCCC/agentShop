@@ -34,6 +34,7 @@ export default function Checkout() {
   const { token } = useParams();
   const [params] = useSearchParams();
   const orderId = params.get("order");
+  const itemQuery = params.get("items");
   const [cart, setCart] = useState(null);
   const [quote, setQuote] = useState(null);
   const [handoff, setHandoff] = useState(null);
@@ -52,9 +53,16 @@ export default function Checkout() {
     }
     api("/api/cart")
       .then(async (loaded) => {
-        setCart(loaded);
-        if (!loaded.items.length) return;
-        if (loaded.lock?.quote) {
+        const wanted = itemQuery;
+        const ids = wanted ? wanted.split(",").filter(Boolean) : null;
+        const chosen = ids ? loaded.items.filter((item) => ids.includes(item.product_id)) : loaded.items;
+        if (ids && chosen.length !== ids.length) {
+          setError("有的商品不在购物车里");
+        }
+        setCart({ ...loaded, items: chosen });
+        if (!chosen.length) return;
+        const full = chosen.length === loaded.items.length;
+        if (full && loaded.lock?.quote) {
           setQuote(loaded.lock.quote);
           return;
         }
@@ -62,19 +70,22 @@ export default function Checkout() {
           method: "POST",
           body: JSON.stringify({
             channel: "human",
-            items: loaded.items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+            items: chosen.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
           }),
         });
         setQuote(priced);
       })
       .catch((err) => setError(err.message));
-  }, [orderId, token]);
+  }, [orderId, token, itemQuery]);
 
-  async function pay(cartId) {
+  async function pay(cartId, productIds) {
     setPending(true);
     setError("");
     try {
-      const created = await api(`/api/carts/${cartId}/checkout`, { method: "POST", body: "{}" });
+      const created = await api(`/api/carts/${cartId}/checkout`, {
+        method: "POST",
+        body: JSON.stringify(productIds ? { product_ids: productIds } : {}),
+      });
       window.location.assign(`/checkout?order=${created.id}`);
     } catch (err) {
       setError(err.message);
@@ -128,13 +139,13 @@ export default function Checkout() {
       <h1>确认订单</h1>
       {error ? <p className="message">{error}</p> : null}
       {!cart ? <p>正在读取购物车</p> : null}
-      {cart && !cart.items.length ? <p>购物车是空的，无法结账。</p> : null}
+      {cart && !cart.items.length ? <p>没有选择要结账的商品。</p> : null}
       {cart && cart.items.length ? (
         <>
           <Lines items={cart.items} />
-          <p className="meta">没有预勾任何加购。优惠和运费来自报价接口。</p>
+          <p className="meta">优惠和运费按这里列出的商品计算。</p>
           <Money quote={quote} />
-          <button type="button" disabled={pending || !quote} onClick={() => pay(cart.id)}>模拟付款</button>
+          <button type="button" disabled={pending || !quote} onClick={() => pay(cart.id, cart.items.map((item) => item.product_id))}>模拟付款</button>
         </>
       ) : null}
     </section>

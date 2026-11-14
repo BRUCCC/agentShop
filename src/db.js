@@ -8,6 +8,7 @@ fs.mkdirSync(dir, { recursive: true });
 
 const db = new DatabaseSync(file);
 db.exec("PRAGMA foreign_keys = ON");
+db.exec("PRAGMA busy_timeout = 5000");
 db.exec(`
   CREATE TABLE IF NOT EXISTS carts (
     id TEXT PRIMARY KEY,
@@ -38,7 +39,7 @@ db.exec(`
 
   CREATE TABLE IF NOT EXISTS orders (
     id TEXT PRIMARY KEY,
-    cart_id TEXT NOT NULL UNIQUE REFERENCES carts(id),
+    cart_id TEXT NOT NULL REFERENCES carts(id),
     channel TEXT NOT NULL CHECK (channel IN ('human', 'agent')),
     subtotal INTEGER NOT NULL,
     discount INTEGER NOT NULL,
@@ -55,6 +56,21 @@ db.exec(`
     updated_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS catalog_products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    brand TEXT NOT NULL,
+    category TEXT NOT NULL,
+    price INTEGER NOT NULL,
+    stock INTEGER NOT NULL,
+    recommendation_score REAL NOT NULL,
+    rating_avg REAL,
+    review_count INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    specs TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS order_items (
     order_id TEXT NOT NULL REFERENCES orders(id),
     product_id TEXT NOT NULL,
@@ -64,6 +80,30 @@ db.exec(`
     PRIMARY KEY (order_id, product_id)
   );
 `);
+
+const ordersSql = db.prepare("SELECT sql FROM sqlite_master WHERE name = 'orders'").get()?.sql || "";
+if (/cart_id\s+TEXT\s+NOT\s+NULL\s+UNIQUE/i.test(ordersSql)) {
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec(`
+    BEGIN;
+    CREATE TABLE orders_next (
+      id TEXT PRIMARY KEY,
+      cart_id TEXT NOT NULL REFERENCES carts(id),
+      channel TEXT NOT NULL CHECK (channel IN ('human', 'agent')),
+      subtotal INTEGER NOT NULL,
+      discount INTEGER NOT NULL,
+      shipping_fee INTEGER NOT NULL,
+      total INTEGER NOT NULL,
+      created_at TEXT NOT NULL
+    );
+    INSERT INTO orders_next (id, cart_id, channel, subtotal, discount, shipping_fee, total, created_at)
+      SELECT id, cart_id, channel, subtotal, discount, shipping_fee, total, created_at FROM orders;
+    DROP TABLE orders;
+    ALTER TABLE orders_next RENAME TO orders;
+    COMMIT;
+  `);
+  db.exec("PRAGMA foreign_keys = ON");
+}
 
 function soldQuantities() {
   const rows = db

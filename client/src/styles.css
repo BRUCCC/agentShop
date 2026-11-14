@@ -214,6 +214,10 @@ button:disabled { background: #bdbdbd; cursor: not-allowed; }
   margin-bottom: 10px;
 }
 .lines input { width: 80px; border-right: 1px solid #ddd; }
+.lines input.check { width: 16px; height: 16px; border: 0; padding: 0; }
+.pick, .pick-all label { display: flex; gap: 10px; align-items: flex-start; }
+.lines li.pick-all { grid-template-columns: 1fr; }
+.button.disabled { background: #bdbdbd; cursor: not-allowed; }
 .lines.confirm li { grid-template-columns: 1fr auto; }
 .summary { margin-top: 18px; background: #fff; padding: 18px; }
 .message { background: #fff4f4; color: #9d1c1c; padding: 10px 12px; }

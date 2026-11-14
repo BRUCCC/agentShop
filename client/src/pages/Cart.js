@@ -4,11 +4,44 @@ import { api, formatMoney } from "../api";
 
 export default function Cart() {
   const [cart, setCart] = useState(null);
+  const [selected, setSelected] = useState([]);
+  const [quote, setQuote] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api("/api/cart").then(setCart).catch((err) => setError(err.message));
+    api("/api/cart")
+      .then((loaded) => {
+        setCart(loaded);
+        setSelected(loaded.items.map((item) => item.product_id));
+      })
+      .catch((err) => setError(err.message));
   }, []);
+
+  useEffect(() => {
+    if (!cart) return undefined;
+    const items = cart.items.filter((item) => selected.includes(item.product_id));
+    if (!items.length) {
+      setQuote(null);
+      return undefined;
+    }
+    let cancel = false;
+    api("/api/quotes", {
+      method: "POST",
+      body: JSON.stringify({
+        channel: "human",
+        items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
+      }),
+    })
+      .then((priced) => {
+        if (!cancel) setQuote(priced);
+      })
+      .catch((err) => {
+        if (!cancel) setError(err.message);
+      });
+    return () => {
+      cancel = true;
+    };
+  }, [cart, selected]);
 
   async function update(productId, quantity) {
     setError("");
@@ -25,6 +58,15 @@ export default function Cart() {
 
   if (error && !cart) return <p className="message">{error}</p>;
   if (!cart) return <p className="message">正在读取购物车</p>;
+  const allSelected = cart.items.length > 0 && selected.length === cart.items.length;
+
+  function toggle(productId) {
+    setSelected((current) => (
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    ));
+  }
 
   return (
     <section>
@@ -33,11 +75,33 @@ export default function Cart() {
       {error ? <p className="message">{error}</p> : null}
       {!cart.items.length ? <p>购物车还是空的。</p> : null}
       <ul className="lines">
+        {cart.items.length ? (
+          <li className="pick-all">
+            <label>
+              <input
+                className="check"
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? [] : cart.items.map((item) => item.product_id))}
+              />
+              全选
+            </label>
+          </li>
+        ) : null}
         {cart.items.map((item) => (
           <li key={item.product_id}>
-            <div>
-              <Link to={`/products/${item.product_id}`}>{item.name}</Link>
-              <p className="meta">{item.product_id} · {formatMoney(item.unit_price)}</p>
+            <div className="pick">
+              <input
+                className="check"
+                type="checkbox"
+                aria-label={`选择 ${item.name}`}
+                checked={selected.includes(item.product_id)}
+                onChange={() => toggle(item.product_id)}
+              />
+              <div>
+                <Link to={`/products/${item.product_id}`}>{item.name}</Link>
+                <p className="meta">{item.product_id} · {formatMoney(item.unit_price)}</p>
+              </div>
             </div>
             <label>
               数量
@@ -58,15 +122,19 @@ export default function Cart() {
       </ul>
       {cart.items.length ? (
         <div className="summary">
-          <p>标价合计 {formatMoney(cart.sticker_total)}</p>
-          {cart.offers ? (
+          <p>标价合计 {quote ? formatMoney(quote.subtotal) : "请选择要结账的商品"}</p>
+          {quote?.offers ? (
             <p className="offer">
-              {cart.offers.discount_qualified
-                ? `已满 ${formatMoney(cart.offers.discount_threshold)}，可减 ${formatMoney(cart.offers.discount_amount)}`
-                : `差 ${formatMoney(cart.offers.discount_gap)} 可享折扣`}
+              {quote.offers.discount_qualified
+                ? `已满 ${formatMoney(quote.offers.discount_threshold)}，可减 ${formatMoney(quote.offers.discount_amount)}`
+                : `差 ${formatMoney(quote.offers.discount_gap)} 可享折扣`}
             </p>
           ) : null}
-          <Link className="button" to="/checkout">去结账</Link>
+          {selected.length ? (
+            <Link className="button" to={`/checkout?items=${selected.join(",")}`}>去结账</Link>
+          ) : (
+            <span className="button disabled">去结账</span>
+          )}
         </div>
       ) : null}
     </section>

@@ -4,7 +4,7 @@
   "scripts": {
     "dev": "node server/index.js",
     "start": "node server/index.js",
-    "test": "node --test src/domain/pricing.test.js"
+    "test": "node --test src/domain/pricing.test.js src/domain/rag.test.js src/domain/recommend.test.js"
   },
   "dependencies": {
     "@babel/core": "^7.29.13",

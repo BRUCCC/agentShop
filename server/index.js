@@ -8,6 +8,7 @@ const config = require("../webpack.config");
 const { offerRules, offerForLines } = require("../src/domain/pricing");
 const { catalog, searchProducts, findProduct, detailItem } = require("../src/domain/catalog");
 const { heldQuantities, soldQuantities, releaseExpired } = require("../src/db");
+const { recommendProducts } = require("../src/domain/rag");
 const { createCart, getCart, getCartRow, setItem, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
 const { chat } = require("../src/chat");
 
@@ -95,6 +96,15 @@ app.get("/api/products/:id", (req, res) => {
   res.json(detailItem(product, held(product.id), sold(product.id)));
 });
 
+app.post("/api/recommendations", (req, res) => {
+  releaseExpired();
+  const query = typeof req.body?.query === "string" ? req.body.query : "";
+  res.json(recommendProducts(query.trim(), quantityLookup(heldQuantities), quantityLookup(soldQuantities), {
+    limit: parseLimit(req.body?.limit),
+    offset: parseOffset(req.body?.offset),
+  }));
+});
+
 app.get("/api/cart", (req, res) => {
   const id = readCookie(req, "cart_id");
   const row = id ? getCartRow(id) : null;
@@ -174,8 +184,11 @@ app.post("/api/chat", async (req, res) => {
 
 app.post("/api/carts/:id/checkout", (req, res) => {
   try {
-    const order = checkout(req.params.id);
-    if (readCookie(req, "cart_id") === req.params.id) clearCartCookie(res);
+    const order = checkout(req.params.id, undefined, req.body?.product_ids);
+    const remaining = getCart(req.params.id);
+    if (readCookie(req, "cart_id") === req.params.id && (!remaining || remaining.status === "ordered" || !remaining.items.length)) {
+      clearCartCookie(res);
+    }
     res.status(201).json(order);
   } catch (error) {
     sendError(res, error.status || 500, error.code || "VALIDATION", error.message);

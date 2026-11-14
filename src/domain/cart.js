@@ -182,6 +182,7 @@ function quoteProducts(channel, rawItems) {
     };
   });
   const priced = priceOrder(lines, channel);
+  priced.offers = offerForLines(lines);
   priced.items = priced.items.map((line, index) => ({
     ...line,
     available: lines[index].available,
@@ -206,7 +207,7 @@ function holdsMatch(cart, holds) {
   return cart.items.every((item) => quantities.get(item.product_id) === item.quantity);
 }
 
-function insertOrder(cartId, channel, priced) {
+function insertOrder(cartId, channel, priced, closeCart) {
   const orderId = newId("order");
   const createdAt = nowIso();
   db.prepare(
@@ -219,44 +220,52 @@ function insertOrder(cartId, channel, priced) {
   for (const item of priced.items) {
     insertItem.run(orderId, item.product_id, item.name, item.quantity, item.unit_price);
   }
-  db.prepare("UPDATE carts SET status = 'ordered', updated_at = ? WHERE id = ?").run(createdAt, cartId);
+  if (closeCart) {
+    db.prepare("UPDATE carts SET status = 'ordered', updated_at = ? WHERE id = ?").run(createdAt, cartId);
+  } else {
+    const remove = db.prepare("DELETE FROM cart_items WHERE cart_id = ? AND product_id = ?");
+    for (const item of priced.items) remove.run(cartId, item.product_id);
+    db.prepare("UPDATE carts SET updated_at = ? WHERE id = ?").run(createdAt, cartId);
+  }
   return orderId;
 }
 
-function checkout(cartId, channel) {
-  const existing = db.prepare("SELECT * FROM orders WHERE cart_id = ?").get(cartId);
-  if (existing) return orderPayload(existing.id);
+function chosenItems(cart, productIds) {
+  if (!Array.isArray(productIds)) return cart.items;
+  const wanted = [...new Set(productIds.filter((id) => typeof id === "string" && id))];
+  if (!wanted.length) fail(400, "VALIDATION", "请选择要结账的商品");
+  const items = cart.items.filter((item) => wanted.includes(item.product_id));
+  if (items.length !== wanted.length) fail(400, "VALIDATION", "有的商品不在购物车里");
+  return items;
+}
+
+function checkout(cartId, channel, productIds) {
+  const cartRow = getCartRow(cartId);
+  if (!cartRow) fail(404, "CART_NOT_FOUND", "购物车不存在");
+  if (cartRow.status === "ordered") {
+    const existing = db.prepare("SELECT id FROM orders WHERE cart_id = ? ORDER BY created_at DESC").get(cartId);
+    if (existing) return orderPayload(existing.id);
+  }
 
   const cart = getCart(cartId);
-  if (!cart) {
-    const error = new Error("购物车不存在");
-    error.status = 404;
-    error.code = "CART_NOT_FOUND";
-    throw error;
-  }
-  if (!cart.items.length) {
-    const error = new Error("购物车是空的");
-    error.status = 400;
-    error.code = "VALIDATION";
-    throw error;
-  }
+  if (!cart.items.length) fail(400, "VALIDATION", "购物车是空的");
+  const items = chosenItems(cart, productIds);
+  const full = items.length === cart.items.length;
   const holds = activeHolds(cartId);
-  const locked = holds.length && holdsMatch(cart, holds) ? JSON.parse(holds[0].quote_snapshot) : null;
+  const locked = full && holds.length && holdsMatch(cart, holds) ? JSON.parse(holds[0].quote_snapshot) : null;
   if (holds.length && !locked) releaseHolds(cartId);
-  const fresh = locked ? cart : getCart(cartId);
+  const fresh = getCart(cartId);
+  const selling = full ? fresh.items : fresh.items.filter((item) => items.some((chosen) => chosen.product_id === item.product_id));
   if (!locked) {
-    const blocked = fresh.items.filter((item) => item.missing || !item.sellable || item.quantity > item.available);
-    if (blocked.length) {
-      fail(409, "OUT_OF_STOCK", `${blocked.map((item) => item.name).join("、")} 现在不能购买`);
-    }
+    const blocked = selling.filter((item) => item.missing || !item.sellable || item.quantity > item.available);
+    if (blocked.length) fail(409, "OUT_OF_STOCK", `${blocked.map((item) => item.name).join("、")} 现在不能购买`);
   }
   const requested = channel === "agent" ? "agent" : "human";
-  const priced = locked || priceOrder(fresh.items, requested);
-  fresh.channel = locked ? locked.channel : requested;
+  const priced = locked || priceOrder(selling, requested);
 
   db.exec("BEGIN");
   try {
-    const orderId = insertOrder(cartId, fresh.channel, priced);
+    const orderId = insertOrder(cartId, locked ? locked.channel : requested, priced, full);
     if (locked) {
       db.prepare("UPDATE reservations SET status = 'consumed' WHERE cart_id = ? AND status = 'held'").run(cartId);
     }
@@ -316,7 +325,9 @@ function createHandoff(cartId, channel = "agent") {
 function getHandoff(token) {
   const cart = db.prepare("SELECT * FROM carts WHERE handoff_token = ?").get(token);
   if (!cart) return null;
-  const order = db.prepare("SELECT id FROM orders WHERE cart_id = ?").get(cart.id);
+  const order = cart.status === "ordered"
+    ? db.prepare("SELECT id FROM orders WHERE cart_id = ? ORDER BY created_at DESC").get(cart.id)
+    : null;
   if (order) {
     return { token, cart_id: cart.id, channel: cart.channel, ordered: true, order: orderPayload(order.id) };
   }

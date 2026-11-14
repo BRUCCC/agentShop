@@ -1,5 +1,6 @@
 const { catalog, findProduct, availability } = require("./catalog");
 const { db } = require("../db");
+const { countCatalogProducts, recommendByAlgorithm, syncCatalogProducts, usesAlgorithm } = require("./recommend");
 
 const insertLayer = db.prepare(
   `INSERT INTO catalog_layers (category, l0, l1, l2, updated_at)
@@ -63,6 +64,7 @@ function rebuildLayers() {
         now,
       );
     }
+    syncCatalogProducts(catalog().products, now);
     db.exec("COMMIT");
   } catch (error) {
     db.exec("ROLLBACK");
@@ -86,7 +88,8 @@ function scoreQuery(query, l0) {
   return score;
 }
 
-function recommendProducts(query, held, sold) {
+function recommendProducts(query, held, sold, options) {
+  if (usesAlgorithm(countCatalogProducts())) return recommendByAlgorithm(query, held, sold, options);
   const rows = db.prepare("SELECT category, l0, l1 FROM catalog_layers").all();
   const ranked = rows
     .map((row) => ({ category: row.category, score: scoreQuery(query, row.l0), l1: row.l1 }))
@@ -105,6 +108,7 @@ function recommendProducts(query, held, sold) {
     }
   }
   return {
+    mode: "rag",
     query,
     layer: "L1",
     categories: picked.map((row) => row.category),
