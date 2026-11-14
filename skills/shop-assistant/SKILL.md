@@ -29,7 +29,7 @@ disable-model-invocation: true
 
 页面上的 `POST /api/carts` 使用 `{ "channel": "human" }`，只是在还没有车时创建这一辆。对话栏改的是 cookie 里的同一辆。
 
-对话栏顶部只由用户提供 API key。模型地址和模型名称在服务端 `.env`，不要写进页面、仓库或回复。
+对话栏顶部由用户提供 API key。模型地址和模型名称默认填在输入框里，请求时一并提交。不要把密钥写进仓库或回复。
 
 ## 不要做
 

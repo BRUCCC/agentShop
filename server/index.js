@@ -156,6 +156,8 @@ app.post("/api/chat", async (req, res) => {
   try {
     const result = await chat({
       apiKey: req.body?.api_key,
+      apiBase: req.body?.api_base,
+      model: req.body?.model,
       cartId: readCookie(req, "cart_id"),
       messages: req.body?.messages,
     });

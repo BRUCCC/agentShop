@@ -27,4 +27,4 @@ npm run dev
 
 浏览器打开 http://localhost:3000 。搜索、加入购物车和模拟付款都会在写入后重新加载页面，再向商品接口读取标价。
 
-对话栏只填写 API key。模型地址和模型名称写在本机 `.env`，可按 `.env.example` 复制。这个文件不提交。
+对话栏填写 API key。模型地址和模型名称已经填在旁边的输入框里，默认是 `https://api.deepseek.com` 和 `deepseek-chat`。密钥不要写进仓库。

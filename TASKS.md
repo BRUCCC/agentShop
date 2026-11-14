@@ -42,7 +42,7 @@
 - [x] 报价
 - [x] 更新购物车
 - [x] 交接链接，预留带 `reserved_at` 和 `expires_at`
-- [x] `.cursor/skills/shop-assistant/SKILL.md` 写清调用方式：可以下单，但加入购物车本身不下单
+- [x] `skills/shop-assistant/SKILL.md` 写清调用方式：可以下单，但加入购物车本身不下单
 
 ## 右侧对话栏
 
@@ -51,7 +51,7 @@
 ## 提交材料
 
 - [ ] `README.md` 写清启动和测试
-- [ ] `.cursor/skills/shared-pricing/SKILL.md` 写完，并记下用了几次、改过几版
+- [ ] `skills/shared-pricing/SKILL.md` 写完，并记下用了几次、改过几版
 - [ ] `docs/agent-shopping-log.md` 放上真实购物记录，或在 README 指向录像
 - [ ] `AI_NOTES.md` 写成 3 到 5 则
 - [ ] 提交历史保持完整，不 squash

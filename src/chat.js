@@ -184,12 +184,12 @@ function hideKey(text, apiKey) {
   return text.split(apiKey).join("［已隐藏］");
 }
 
-async function chat({ apiKey, cartId, messages }) {
+async function chat({ apiKey, apiBase, model, cartId, messages }) {
   if (!apiKey || !String(apiKey).trim()) fail(400, "MODEL_UNAVAILABLE", "没有填写 API key，不能调用模型");
-  const apiBase = process.env.SHOP_MODEL_BASE;
-  const model = process.env.SHOP_MODEL;
-  if (!apiBase || !model) fail(500, "MODEL_UNAVAILABLE", "服务还没有配置模型");
-  const url = endpointFor(apiBase);
+  if (!apiBase || !String(apiBase).trim() || !model || !String(model).trim()) {
+    fail(400, "MODEL_UNAVAILABLE", "没有填写模型地址或模型名称");
+  }
+  const url = endpointFor(String(apiBase).trim());
   const userText = latestUserText(messages);
   const state = { cartId: cartId || null, changed: false, ordered: false };
   const transcript = [{ role: "system", content: SYSTEM_PROMPT }, ...normalizeMessages(messages)];

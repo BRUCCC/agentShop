@@ -24,6 +24,8 @@ function writeStorage(key, value) {
 
 export default function ChatSidebar({ open }) {
   const [apiKey, setApiKey] = useState("");
+  const [apiBase, setApiBase] = useState("https://api.deepseek.com");
+  const [model, setModel] = useState("deepseek-chat");
   const [messages, setMessages] = useState(() => {
     try {
       const saved = JSON.parse(readStorage(STORAGE.messages) || "[]");
@@ -58,7 +60,7 @@ export default function ChatSidebar({ open }) {
   async function send(event) {
     event.preventDefault();
     const content = draft.trim();
-    if (!content || pending || !apiKey.trim()) return;
+    if (!content || pending || !apiKey.trim() || !apiBase.trim() || !model.trim()) return;
     const next = [...messages, { role: "user", content }];
     setMessages(next);
     setDraft("");
@@ -70,6 +72,8 @@ export default function ChatSidebar({ open }) {
         method: "POST",
         body: JSON.stringify({
           api_key: apiKey,
+          api_base: apiBase.trim(),
+          model: model.trim(),
           messages: next,
         }),
       });
@@ -101,6 +105,28 @@ export default function ChatSidebar({ open }) {
           onChange={(event) => setApiKey(event.target.value)}
         />
       </label>
+      <label className="field">
+        模型地址
+        <input
+          type="text"
+          name="shop-model-base"
+          value={apiBase}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => setApiBase(event.target.value)}
+        />
+      </label>
+      <label className="field">
+        模型名称
+        <input
+          type="text"
+          name="shop-model"
+          value={model}
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => setModel(event.target.value)}
+        />
+      </label>
       <p className="meta">和页面是同一辆购物车，现有 {cartCount} 件。只说加入购物车时不会下单。</p>
       {offers ? (
         <p className="offer">
@@ -124,7 +150,7 @@ export default function ChatSidebar({ open }) {
           placeholder={apiKey.trim() ? "查商品、报价、加购或下单" : "填写 API key 后才能发送"}
           onChange={(event) => setDraft(event.target.value)}
         />
-        <button type="submit" disabled={pending || !apiKey.trim() || !draft.trim()}>发送</button>
+        <button type="submit" disabled={pending || !apiKey.trim() || !apiBase.trim() || !model.trim() || !draft.trim()}>发送</button>
       </form>
     </aside>
   );
