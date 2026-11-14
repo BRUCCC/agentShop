@@ -163,9 +163,12 @@ app.post("/api/chat", async (req, res) => {
     });
     if (result.ordered) clearCartCookie(res);
     else if (result.cart_id) setCartCookie(res, result.cart_id);
-    res.json({ reply: result.reply, changed: result.changed });
+    res.json({ reply: result.reply, changed: result.changed, usage: result.usage });
   } catch (error) {
-    sendError(res, error.status || 500, error.code || "MODEL_UNAVAILABLE", error.message);
+    res.status(error.status || 500).json({
+      error: { code: error.code || "MODEL_UNAVAILABLE", message: error.message },
+      ...(error.usage ? { usage: error.usage } : {}),
+    });
   }
 });
 

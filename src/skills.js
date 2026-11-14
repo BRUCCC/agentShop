@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const root = path.join(__dirname, "../skills");
-const toolOrder = ["search_products", "get_product", "quote", "update_cart", "create_handoff", "place_order"];
+const toolOrder = ["recommend", "search_products", "get_product", "quote", "update_cart", "create_handoff", "place_order"];
 
 function parseFrontmatter(text) {
   const match = text.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);

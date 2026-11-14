@@ -115,6 +115,16 @@ button:disabled { background: #bdbdbd; cursor: not-allowed; }
   background: var(--accent-soft);
   border-radius: 16px 16px 16px 4px;
 }
+.report {
+  align-self: stretch;
+  max-width: 100%;
+  background: #f7f7f5;
+  color: #555;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.6;
+  font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
 .composer { display: flex; flex-direction: column; gap: 8px; }
 .composer textarea { min-height: 72px; resize: vertical; }
 .composer button { border-radius: 12px; }

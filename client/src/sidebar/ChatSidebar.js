@@ -13,6 +13,17 @@ function readStorage(key) {
   }
 }
 
+function modelMessages(list) {
+  return list
+    .filter((message) => message.role === "user" || message.role === "assistant")
+    .map((message) => ({ role: message.role, content: message.content }));
+}
+
+function withReport(list, usage) {
+  if (!usage?.report) return list;
+  return [...list, { role: "report", content: usage.report }];
+}
+
 function writeStorage(key, value) {
   try {
     if (value) sessionStorage.setItem(key, value);
@@ -74,10 +85,10 @@ export default function ChatSidebar({ open }) {
           api_key: apiKey,
           api_base: apiBase.trim(),
           model: model.trim(),
-          messages: next,
+          messages: modelMessages(next),
         }),
       });
-      const saved = [...next, { role: "assistant", content: result.reply }];
+      const saved = withReport([...next, { role: "assistant", content: result.reply }], result.usage);
       writeStorage(STORAGE.messages, JSON.stringify(saved));
       if (result.changed) {
         window.location.reload();
@@ -85,6 +96,9 @@ export default function ChatSidebar({ open }) {
       }
       setMessages(saved);
     } catch (err) {
+      const saved = withReport(next, err.usage);
+      setMessages(saved);
+      writeStorage(STORAGE.messages, JSON.stringify(saved));
       setError(err.message);
     } finally {
       setPending(false);
@@ -136,7 +150,7 @@ export default function ChatSidebar({ open }) {
       ) : null}
       <div className="transcript">
         {messages.map((message, index) => (
-          <p key={`${message.role}-${index}`} className={message.role === "user" ? "mine" : "reply"}>
+          <p key={`${message.role}-${index}`} className={message.role === "user" ? "mine" : message.role === "report" ? "report" : "reply"}>
             {message.content}
           </p>
         ))}

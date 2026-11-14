@@ -20,12 +20,13 @@ disable-model-invocation: true
 
 具体动作看这些 skill：
 
-1. `shop-search`：搜索，默认 8 笔，最多 20 笔。
-2. `shop-product`：按 id 看规格和库存。P001 和 P002 不能互换。
-3. `shop-quote`：报价。不锁库存。
-4. `shop-update-cart`：改这辆车。数量 0 是删除。不下单。
-5. `shop-handoff`：锁库存 24 小时并给出确认链接。不下单。
-6. `shop-place-order`：只有用户明确要下单时才下单。
+1. `shop-recommend`：按需求推荐。只取相关品类，回复里不写商品 id，不贴评论。
+2. `shop-search`：搜索，默认 8 笔，最多 20 笔。
+3. `shop-product`：按 id 看规格和库存。P001 和 P002 不能互换。
+4. `shop-quote`：报价。不锁库存。
+5. `shop-update-cart`：改这辆车。数量 0 是删除。不下单。
+6. `shop-handoff`：锁库存 24 小时并给出确认链接。不下单。
+7. `shop-place-order`：只有用户明确要下单时才下单。
 
 页面上的 `POST /api/carts` 使用 `{ "channel": "human" }`，只是在还没有车时创建这一辆。对话栏改的是 cookie 里的同一辆。
 

@@ -1,4 +1,5 @@
 const { searchProducts, findProduct, detailItem } = require("./domain/catalog");
+const { recommendProducts } = require("./domain/rag");
 const { heldQuantities, soldQuantities } = require("./db");
 const {
   getCartRow,
@@ -92,6 +93,11 @@ function ensureOpenCart(state) {
 }
 
 function runTool(name, args, state, userText) {
+  if (name === "recommend") {
+    const query = typeof args.query === "string" ? args.query.trim() : "";
+    if (!query) return toolError({ code: "VALIDATION", message: "需要顾客的需求" });
+    return recommendProducts(query, quantityLookup(heldQuantities), quantityLookup(soldQuantities));
+  }
   if (name === "search_products") {
     const limit = Number(args.limit);
     return searchProducts({
@@ -176,7 +182,52 @@ async function callModel({ url, apiKey, model, messages }) {
   const payload = await response.json().catch(() => null);
   const message = payload?.choices?.[0]?.message;
   if (!message) fail(502, "MODEL_UNAVAILABLE", "模型没有返回内容");
-  return message;
+  return { message, usage: usageFrom(payload) };
+}
+
+function usageFrom(payload) {
+  const usage = payload?.usage;
+  if (!usage) return null;
+  const prompt = Number(usage.prompt_tokens);
+  const completion = Number(usage.completion_tokens);
+  const total = Number(usage.total_tokens);
+  if (!Number.isFinite(prompt) || !Number.isFinite(completion) || !Number.isFinite(total)) return null;
+  return { prompt_tokens: prompt, completion_tokens: completion, total_tokens: total };
+}
+
+function emptyUsage() {
+  return { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, rounds: 0, missing: 0 };
+}
+
+function addUsage(sum, usage) {
+  if (!usage) {
+    sum.missing += 1;
+    return;
+  }
+  sum.prompt_tokens += usage.prompt_tokens;
+  sum.completion_tokens += usage.completion_tokens;
+  sum.total_tokens += usage.total_tokens;
+  sum.rounds += 1;
+}
+
+function usageSummary(sum) {
+  const calls = sum.rounds + sum.missing;
+  const lines = ["Token 报告", `这次任务调用模型 ${calls} 次。`];
+  if (sum.rounds === 0) {
+    lines.push("模型没有返回用量，这次任务无法合计。");
+  } else {
+    lines.push(`输入 ${sum.prompt_tokens} token，输出 ${sum.completion_tokens} token，合计 ${sum.total_tokens} token。`);
+    lines.push("合计是这一次任务里各次模型调用相加。");
+  }
+  if (sum.missing > 0 && sum.rounds > 0) lines.push(`${sum.missing} 次调用没有返回用量，没有计入合计。`);
+  return {
+    prompt_tokens: sum.prompt_tokens,
+    completion_tokens: sum.completion_tokens,
+    total_tokens: sum.total_tokens,
+    calls,
+    reported_calls: sum.rounds,
+    report: lines.join("\n"),
+  };
 }
 
 function hideKey(text, apiKey) {
@@ -193,10 +244,19 @@ async function chat({ apiKey, apiBase, model, cartId, messages }) {
   const userText = latestUserText(messages);
   const state = { cartId: cartId || null, changed: false, ordered: false };
   const transcript = [{ role: "system", content: SYSTEM_PROMPT }, ...normalizeMessages(messages)];
+  const spent = emptyUsage();
 
   let reply = "";
   for (let round = 0; round < MAX_ROUNDS; round += 1) {
-    const message = await callModel({ url, apiKey: String(apiKey), model: String(model).trim(), messages: transcript });
+    let called;
+    try {
+      called = await callModel({ url, apiKey: String(apiKey), model: String(model).trim(), messages: transcript });
+    } catch (error) {
+      error.usage = usageSummary(spent);
+      throw error;
+    }
+    addUsage(spent, called.usage);
+    const message = called.message;
     const calls = Array.isArray(message.tool_calls) ? message.tool_calls : [];
     if (!calls.length) {
       reply = typeof message.content === "string" ? message.content : "";
@@ -224,6 +284,7 @@ async function chat({ apiKey, apiBase, model, cartId, messages }) {
     cart_id: state.ordered ? null : state.cartId,
     changed: state.changed,
     ordered: state.ordered,
+    usage: usageSummary(spent),
   };
 }
 

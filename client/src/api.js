@@ -11,6 +11,7 @@ export async function api(path, options = {}) {
   if (!response.ok) {
     const error = new Error(data.error?.message || "请求失败");
     error.code = data.error?.code;
+    error.usage = data.usage;
     throw error;
   }
   return data;

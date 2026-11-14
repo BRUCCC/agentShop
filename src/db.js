@@ -47,6 +47,14 @@ db.exec(`
     created_at TEXT NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS catalog_layers (
+    category TEXT PRIMARY KEY,
+    l0 TEXT NOT NULL,
+    l1 TEXT NOT NULL,
+    l2 TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+  );
+
   CREATE TABLE IF NOT EXISTS order_items (
     order_id TEXT NOT NULL REFERENCES orders(id),
     product_id TEXT NOT NULL,
