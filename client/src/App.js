@@ -72,7 +72,7 @@ export default function App() {
           </Routes>
           </ActorContext.Provider>
         </main>
-        <ChatSidebar open={chatOpen} actor={actor} />
+        <ChatSidebar open={chatOpen} />
       </div>
       <footer className="footer">标价来自商品目录。优惠和运费只出现在报价和确认页。</footer>
     </div>

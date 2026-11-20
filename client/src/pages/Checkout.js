@@ -4,20 +4,32 @@ import { api, formatMoney } from "../api";
 import { useActor } from "../actor";
 
 function Money({ quote }) {
-  if (!quote) return null;
+  if (!quote) return <p className="meta">正在计算金额</p>;
   return (
-    <div className="summary">
-      <p>商品小计 {formatMoney(quote.subtotal)}</p>
-      <p>优惠 {formatMoney(quote.discount)}</p>
-      <p>运费 {formatMoney(quote.shipping_fee)}</p>
-      <p>应付 {formatMoney(quote.total)}</p>
-    </div>
+    <dl className="checkout-totals">
+      <div>
+        <dt>商品小计</dt>
+        <dd>{formatMoney(quote.subtotal)}</dd>
+      </div>
+      <div>
+        <dt>优惠</dt>
+        <dd>{formatMoney(quote.discount)}</dd>
+      </div>
+      <div>
+        <dt>运费</dt>
+        <dd>{formatMoney(quote.shipping_fee)}</dd>
+      </div>
+      <div className="checkout-due">
+        <dt>应付</dt>
+        <dd>{formatMoney(quote.total)}</dd>
+      </div>
+    </dl>
   );
 }
 
 function Lines({ items }) {
   return (
-    <ul className="lines confirm">
+    <ul className="checkout-lines">
       {items.map((item) => (
         <li key={item.product_id}>
           <div>
@@ -28,6 +40,28 @@ function Lines({ items }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function Frame({ crumb, title, note, error, extra, items, quote, action }) {
+  return (
+    <section className="checkout">
+      <p className="crumb">{crumb}</p>
+      <h1>{title}</h1>
+      {error ? <p className="message">{error}</p> : null}
+      {extra}
+      {items ? (
+        <div className="checkout-layout">
+          <Lines items={items} />
+          <aside className="checkout-panel">
+            <h2>结算</h2>
+            {note ? <p className="meta">{note}</p> : null}
+            <Money quote={quote} />
+            {action}
+          </aside>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -97,13 +131,13 @@ export default function Checkout() {
 
   if (order) {
     return (
-      <section>
-        <p className="crumb"><Link to="/">首页</Link> / 订单</p>
-        <h1>付款已模拟完成</h1>
-        <p>订单号 {order.id}</p>
-        <Lines items={order.items} />
-        <Money quote={order} />
-      </section>
+      <Frame
+        crumb={<><Link to="/">首页</Link> / 订单</>}
+        title="付款已模拟完成"
+        note={`订单号 ${order.id}`}
+        items={order.items}
+        quote={order}
+      />
     );
   }
 
@@ -111,45 +145,54 @@ export default function Checkout() {
     const finished = handoff?.ordered ? handoff.order : null;
     const quoteForPage = finished || handoff?.quote;
     const shortages = handoff?.shortages || [];
+    const notes = [
+      finished ? `订单号 ${finished.id}` : "",
+      handoff && !handoff.ordered && handoff.expired ? "锁价已过期，金额按当前目录重新计算。" : "",
+    ].filter(Boolean);
     return (
-      <section>
-        <p className="crumb"><Link to="/">首页</Link> / 确认</p>
-        <h1>确认订单</h1>
-        {error ? <p className="message">{error}</p> : null}
-        {!handoff && !error ? <p>正在读取交接</p> : null}
-        {finished ? <p>订单号 {finished.id}</p> : null}
-        {handoff && !handoff.ordered && handoff.expired ? <p>锁价已过期，下面是按当前目录重新计算的金额。</p> : null}
-        {quoteForPage ? <Lines items={quoteForPage.items} /> : null}
-        {shortages.length ? (
-          <p className="message">
-            缺少：{shortages.map((item) => `${item.name} 需要 ${item.requested} 件，现有 ${item.available} 件`).join("；")}
-          </p>
+      <Frame
+        crumb={<><Link to="/">首页</Link> / 确认</>}
+        title="确认订单"
+        note={notes.join(" ")}
+        error={error}
+        extra={!handoff && !error ? <p className="meta">正在读取交接</p> : null}
+        items={quoteForPage?.items}
+        quote={quoteForPage}
+        action={handoff && !finished ? (
+          <>
+            {shortages.length ? (
+              <p className="message">
+                缺少：{shortages.map((item) => `${item.name} 需要 ${item.requested} 件，现有 ${item.available} 件`).join("；")}
+              </p>
+            ) : null}
+            <button type="button" className="checkout-pay" disabled={pending || shortages.length || !quoteForPage} onClick={() => pay(handoff.cart_id)}>
+              模拟付款
+            </button>
+          </>
         ) : null}
-        <Money quote={quoteForPage} />
-        {handoff && !finished ? (
-          <button type="button" disabled={pending || shortages.length || !quoteForPage} onClick={() => pay(handoff.cart_id)}>
-            模拟付款
-          </button>
-        ) : null}
-      </section>
+      />
     );
   }
 
   return (
-    <section>
-      <p className="crumb"><Link to="/cart">购物车</Link> / 确认</p>
-      <h1>确认订单</h1>
-      {error ? <p className="message">{error}</p> : null}
-      {!cart ? <p>正在读取购物车</p> : null}
-      {cart && !cart.items.length ? <p>没有选择要结账的商品。</p> : null}
-      {cart && cart.items.length ? (
-        <>
-          <Lines items={cart.items} />
-          <p className="meta">优惠和运费按这里列出的商品计算。</p>
-          <Money quote={quote} />
-          <button type="button" disabled={pending || !quote} onClick={() => pay(cart.id, cart.items.map((item) => item.product_id))}>模拟付款</button>
-        </>
+    <Frame
+      crumb={<><Link to="/cart">购物车</Link> / 确认</>}
+      title="确认订单"
+      note={cart?.items.length ? "优惠和运费按这里列出的商品计算。" : ""}
+      error={error}
+      extra={!cart ? <p className="meta">正在读取购物车</p> : cart.items.length ? null : <p>没有选择要结账的商品。</p>}
+      items={cart?.items.length ? cart.items : null}
+      quote={quote}
+      action={cart?.items.length ? (
+        <button
+          type="button"
+          className="checkout-pay"
+          disabled={pending || !quote}
+          onClick={() => pay(cart.id, cart.items.map((item) => item.product_id))}
+        >
+          模拟付款
+        </button>
       ) : null}
-    </section>
+    />
   );
 }

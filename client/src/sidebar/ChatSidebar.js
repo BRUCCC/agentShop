@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, formatMoney } from "../api";
+import { api } from "../api";
 
 const STORAGE = {
   messages: "shop.chat.messages",
@@ -33,7 +33,7 @@ function writeStorage(key, value) {
   }
 }
 
-export default function ChatSidebar({ open, actor }) {
+export default function ChatSidebar({ open }) {
   const [apiKey, setApiKey] = useState("");
   const [apiBase, setApiBase] = useState("https://api.deepseek.com");
   const [model, setModel] = useState("deepseek-chat");
@@ -45,8 +45,6 @@ export default function ChatSidebar({ open, actor }) {
       return [];
     }
   });
-  const [cartCount, setCartCount] = useState(0);
-  const [offers, setOffers] = useState(null);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -60,12 +58,6 @@ export default function ChatSidebar({ open, actor }) {
         // 清不掉旧密钥时，也不再写入新的。
       }
     }
-    api("/api/cart")
-      .then((cart) => {
-        setCartCount(cart.count || 0);
-        setOffers(cart.offers || null);
-      })
-      .catch(() => setCartCount(0));
   }, []);
 
   async function send(event) {
@@ -141,20 +133,6 @@ export default function ChatSidebar({ open, actor }) {
           onChange={(event) => setModel(event.target.value)}
         />
       </label>
-      <p className="meta">和页面是同一辆购物车，现有 {cartCount} 件。只说加入购物车时不会下单。</p>
-      {offers ? (
-        <p className="offer">
-          {actor === "agent"
-            ? `当前是 AI 下单。满 ${formatMoney(offers.discount_threshold)} 减 ${formatMoney(offers.discount_amount)} 后，商品金额再享 ${offers.agent_percent} 折，运费不参加。`
-            : `满 ${formatMoney(offers.discount_threshold)} 减 ${formatMoney(offers.discount_amount)}。满 ${formatMoney(offers.shipping_threshold)} 免运费，未满运费 ${formatMoney(offers.shipping_fee)}。`}
-          {cartCount > 0
-            ? offers.shipping_qualified
-              ? ` 这辆车已满 ${formatMoney(offers.shipping_threshold)}，免运费。`
-              : ` 这辆车运费 ${formatMoney(offers.shipping_due)}，差 ${formatMoney(offers.shipping_gap)} 可免运费。`
-            : ""}
-          {actor === "agent" && offers.agent_extra > 0 ? ` 这辆车可比人类下单再省 ${formatMoney(offers.agent_extra)}。` : ""}
-        </p>
-      ) : null}
       <div className="transcript">
         {messages.map((message, index) => (
           <p key={`${message.role}-${index}`} className={message.role === "user" ? "mine" : message.role === "report" ? "report" : "reply"}>
@@ -168,7 +146,7 @@ export default function ChatSidebar({ open, actor }) {
         <textarea
           value={draft}
           aria-label="对话输入"
-          placeholder={apiKey.trim() ? "查商品、报价、加购或下单" : "填写 API key 后才能发送"}
+          placeholder=""
           onChange={(event) => setDraft(event.target.value)}
         />
         <button type="submit" disabled={pending || !apiKey.trim() || !apiBase.trim() || !model.trim() || !draft.trim()}>发送</button>

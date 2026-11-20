@@ -7,6 +7,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,5 +16,12 @@ jobs:
           cache: npm
       - name: 安装依赖
         run: npm ci
-      - name: 运行价格、渠道、检索和推荐测试
+      - name: 运行单元测试
         run: npm test
+      - name: 启动商店并核对报价
+        run: |
+          npm start &
+          node scripts/verify-pricing.js
+        env:
+          PORT: 3000
+          SHOP_URL: http://127.0.0.1:3000
