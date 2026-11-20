@@ -145,6 +145,11 @@ export default function ChatSidebar({ open }) {
       {offers ? (
         <p className="offer">
           通过对话栏下单额外优惠：满减后的商品金额再享 {offers.agent_percent} 折，运费不参加。
+          {cartCount > 0
+            ? offers.shipping_qualified
+              ? ` 这辆车已满 ${formatMoney(offers.shipping_threshold)}，免运费。`
+              : ` 这辆车运费 ${formatMoney(offers.shipping_due)}，差 ${formatMoney(offers.shipping_gap)} 可免运费。`
+            : ""}
           {offers.agent_extra > 0 ? ` 这辆车还可再省 ${formatMoney(offers.agent_extra)}。` : ""}
         </p>
       ) : null}

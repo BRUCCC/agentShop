@@ -123,6 +123,7 @@ export default function Cart() {
       {cart.items.length ? (
         <div className="summary">
           <p>标价合计 {quote ? formatMoney(quote.subtotal) : "请选择要结账的商品"}</p>
+          {quote ? <p>优惠 {formatMoney(quote.discount)}</p> : null}
           {quote?.offers ? (
             <p className="offer">
               {quote.offers.discount_qualified
@@ -130,6 +131,15 @@ export default function Cart() {
                 : `差 ${formatMoney(quote.offers.discount_gap)} 可享折扣`}
             </p>
           ) : null}
+          {quote ? <p>运费 {formatMoney(quote.shipping_fee)}</p> : null}
+          {quote?.offers ? (
+            <p className="offer">
+              {quote.offers.shipping_qualified
+                ? `已满 ${formatMoney(quote.offers.shipping_threshold)}，免运费`
+                : `差 ${formatMoney(quote.offers.shipping_gap)} 可免运费`}
+            </p>
+          ) : null}
+          {quote ? <p>应付 {formatMoney(quote.total)}</p> : null}
           {selected.length ? (
             <Link className="button" to={`/checkout?items=${selected.join(",")}`}>去结账</Link>
           ) : (

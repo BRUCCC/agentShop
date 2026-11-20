@@ -42,9 +42,15 @@ test("购物车提示用同一套门槛", () => {
   const below = offerForLines([{ product_id: "X", name: "样品", quantity: 1, unit_price: 680 }]);
   assert.equal(below.discount_gap, 320);
   assert.equal(below.discount_qualified, false);
+  assert.equal(below.shipping_gap, 310);
+  assert.equal(below.shipping_qualified, false);
+  assert.equal(below.shipping_due, 100);
   const reached = offerForLines([{ product_id: "X", name: "样品", quantity: 1, unit_price: 1000 }]);
   assert.equal(reached.discount_gap, 0);
   assert.equal(reached.discount_qualified, true);
+  assert.equal(reached.shipping_gap, 0);
+  assert.equal(reached.shipping_qualified, true);
+  assert.equal(reached.shipping_due, 0);
   assert.equal(reached.agent_extra, 45);
 });
 

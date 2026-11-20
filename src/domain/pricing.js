@@ -20,6 +20,9 @@ function offerForLines(lines) {
     ...offerRules(),
     discount_gap: Math.max(0, DISCOUNT_THRESHOLD - human.subtotal),
     discount_qualified: human.subtotal >= DISCOUNT_THRESHOLD,
+    shipping_gap: Math.max(0, SHIPPING_THRESHOLD - human.subtotal),
+    shipping_qualified: human.subtotal >= SHIPPING_THRESHOLD,
+    shipping_due: human.shipping_fee,
     agent_extra: human.total - agent.total,
   };
 }
