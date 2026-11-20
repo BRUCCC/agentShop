@@ -43,4 +43,4 @@
 
 ## 附件
 
-- `products.json`：30 項虛構商品資料（含價格、庫存、規格、使用者評論）。已另存於 `链接数据/products.json`。
+- `products.json`：30 項虛構商品資料（含價格、庫存、規格、使用者評論）。已另存於 `data/products.json`。

@@ -2,7 +2,7 @@
 
 来源：[Sr. Frontend Engineer Home Quiz](https://shepherdtech.notion.site/Sr-Frontend-Engineer-Home-Quiz-2a9a4b7afc888042ac89dd891ab6228a)
 
-以下为页面中与作业方式、缴交物、面试相关的原文，未改写。产品需求见 `产品相关/产品需求.md`。
+以下为页面中与作业方式、缴交物、面试相关的原文，未改写。产品需求见 `product/product-requirements.md`。
 
 ## 作業說明
 
@@ -11,7 +11,6 @@
 過程中不開放提問。遇到不清楚的地方，請自行做合理的假設，並記錄在 DECISIONS.md，面試時我們會一起討論。
 
 - 不需要串接真實金流，結帳用模擬的即可。
-- 建議投入 2 個工作天。
 - 工具不限（Claude Code、Cursor、Codex、Copilot 等都可以），也不需要安裝任何特定的 skill 套件。我們想看的是你為什麼這樣設計你和 AI 的協作方式，而不是用了多少套件。
 - 本題僅用於面試評估，作品不會用於任何商業用途。
 
