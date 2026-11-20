@@ -186,4 +186,5 @@ module.exports = {
   countCatalogProducts,
   rankProducts,
   recommendByAlgorithm,
+  loadCatalogProducts,
 };

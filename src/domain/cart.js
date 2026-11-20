@@ -7,6 +7,11 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function setCartChannel(cartId, channel) {
+  if (channel !== "human" && channel !== "agent") return;
+  db.prepare("UPDATE carts SET channel = ?, updated_at = ? WHERE id = ? AND status = 'open'").run(channel, nowIso(), cartId);
+}
+
 function newId(prefix) {
   return `${prefix}_${crypto.randomBytes(8).toString("hex")}`;
 }
@@ -182,6 +187,7 @@ function quoteProducts(channel, rawItems) {
     };
   });
   const priced = priceOrder(lines, channel);
+  priced.queried_at = new Date().toISOString();
   priced.offers = offerForLines(lines);
   priced.items = priced.items.map((line, index) => ({
     ...line,
@@ -260,7 +266,8 @@ function checkout(cartId, channel, productIds) {
     const blocked = selling.filter((item) => item.missing || !item.sellable || item.quantity > item.available);
     if (blocked.length) fail(409, "OUT_OF_STOCK", `${blocked.map((item) => item.name).join("、")} 现在不能购买`);
   }
-  const requested = channel === "agent" ? "agent" : "human";
+  const stored = cartRow.channel === "agent" ? "agent" : "human";
+  const requested = channel === "agent" || channel === "human" ? channel : stored;
   const priced = locked || priceOrder(selling, requested);
 
   db.exec("BEGIN");
@@ -277,7 +284,7 @@ function checkout(cartId, channel, productIds) {
   }
 }
 
-function createHandoff(cartId, channel = "agent") {
+function createHandoff(cartId, channel = "human") {
   const cart = getCart(cartId);
   if (!cart) fail(404, "CART_NOT_FOUND", "购物车不存在");
   if (cart.status !== "open") fail(409, "VALIDATION", "这个购物车已经结账");
@@ -413,4 +420,5 @@ module.exports = {
   getHandoff,
   checkout,
   orderPayload,
+  setCartChannel,
 };

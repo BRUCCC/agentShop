@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, formatMoney } from "../api";
+import { useActor } from "../actor";
 
 function Money({ quote }) {
   if (!quote) return null;
@@ -35,6 +36,7 @@ export default function Checkout() {
   const [params] = useSearchParams();
   const orderId = params.get("order");
   const itemQuery = params.get("items");
+  const actor = useActor();
   const [cart, setCart] = useState(null);
   const [quote, setQuote] = useState(null);
   const [handoff, setHandoff] = useState(null);
@@ -69,14 +71,14 @@ export default function Checkout() {
         const priced = await api("/api/quotes", {
           method: "POST",
           body: JSON.stringify({
-            channel: "human",
+            channel: actor,
             items: chosen.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
           }),
         });
         setQuote(priced);
       })
       .catch((err) => setError(err.message));
-  }, [orderId, token, itemQuery]);
+  }, [orderId, token, itemQuery, actor]);
 
   async function pay(cartId, productIds) {
     setPending(true);

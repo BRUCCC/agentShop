@@ -71,6 +71,7 @@ function detailItem(product, heldQty, soldQty) {
     description: product.description,
     specs: product.specs,
     reviews: product.reviews,
+    queried_at: new Date().toISOString(),
   };
 }
 
@@ -92,7 +93,7 @@ function searchProducts({ q, brand, category, inStock, limit, offset, held, sold
   }
   const total = items.length;
   const page = items.slice(offset, offset + limit).map((product) => listItem(product, held(product.id), sold(product.id)));
-  return { total, limit, offset, items: page };
+  return { total, limit, offset, items: page, queried_at: new Date().toISOString() };
 }
 
 module.exports = {

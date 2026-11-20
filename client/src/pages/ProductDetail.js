@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, formatMoney } from "../api";
+import { useActor } from "../actor";
 
 export default function ProductDetail() {
   const { id } = useParams();
+  const actor = useActor();
   const [product, setProduct] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
@@ -23,7 +25,7 @@ export default function ProductDetail() {
     setError("");
     try {
       let cart = await api("/api/cart");
-      if (!cart.id) cart = await api("/api/carts", { method: "POST", body: JSON.stringify({ channel: "human" }) });
+      if (!cart.id) cart = await api("/api/carts", { method: "POST", body: JSON.stringify({ channel: actor }) });
       await api(`/api/carts/${cart.id}/items`, {
         method: "PUT",
         body: JSON.stringify({ product_id: id, quantity }),

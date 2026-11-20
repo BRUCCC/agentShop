@@ -27,4 +27,12 @@ npm run dev
 
 浏览器打开 http://localhost:3000 。搜索、加入购物车和模拟付款都会在写入后重新加载页面，再向商品接口读取标价。
 
+## 测试
+
+```bash
+npm test
+```
+
+这条命令检查同一份价格计算，以及渠道、检索和推荐。推送到 GitHub 后，`.github/workflows/test.yml` 会在 Node 22 上执行 `npm ci` 和 `npm test`。测试用到的数据库在运行时生成，不需要提交。
+
 对话栏填写 API key。模型地址和模型名称已经填在旁边的输入框里，默认是 `https://api.deepseek.com` 和 `deepseek-chat`。密钥不要写进仓库。

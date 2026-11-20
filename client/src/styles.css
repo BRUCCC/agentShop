@@ -23,6 +23,13 @@ button, .button, input {
   font: inherit;
 }
 
+.actor-banner {
+  margin: 0;
+  padding: 10px 20px;
+  background: var(--accent-soft);
+  text-align: center;
+}
+
 .page { min-height: 100vh; }
 .header {
   position: sticky;

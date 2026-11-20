@@ -9,7 +9,7 @@ const { offerRules, offerForLines } = require("../src/domain/pricing");
 const { catalog, searchProducts, findProduct, detailItem } = require("../src/domain/catalog");
 const { heldQuantities, soldQuantities, releaseExpired } = require("../src/db");
 const { recommendProducts } = require("../src/domain/rag");
-const { createCart, getCart, getCartRow, setItem, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
+const { createCart, getCart, getCartRow, setItem, setCartChannel, quoteProducts, createHandoff, getHandoff, checkout, orderPayload } = require("../src/domain/cart");
 const { chat } = require("../src/chat");
 
 function loadLocalEnv() {
@@ -46,11 +46,23 @@ function readCookie(req, name) {
 }
 
 function setCartCookie(res, id) {
-  res.setHeader("Set-Cookie", `cart_id=${encodeURIComponent(id)}; Path=/; HttpOnly; SameSite=Lax`);
+  res.appendHeader("Set-Cookie", `cart_id=${encodeURIComponent(id)}; Path=/; HttpOnly; SameSite=Lax`);
 }
 
 function clearCartCookie(res) {
-  res.setHeader("Set-Cookie", "cart_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+  res.appendHeader("Set-Cookie", "cart_id=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0");
+}
+
+function readActor(req) {
+  return readCookie(req, "shop_actor") === "agent" ? "agent" : "human";
+}
+
+function setActorCookie(res, actor) {
+  if (actor === "agent") {
+    res.appendHeader("Set-Cookie", "shop_actor=agent; Path=/; SameSite=Lax");
+  } else {
+    res.appendHeader("Set-Cookie", "shop_actor=; Path=/; SameSite=Lax; Max-Age=0");
+  }
 }
 
 function quantityLookup(load) {
@@ -105,19 +117,36 @@ app.post("/api/recommendations", (req, res) => {
   }));
 });
 
+app.get("/api/session", (req, res) => {
+  res.json({ actor: readActor(req) });
+});
+
+app.post("/api/session", (req, res) => {
+  const actor = req.body?.actor === "agent" ? "agent" : "human";
+  setActorCookie(res, actor);
+  const id = readCookie(req, "cart_id");
+  const row = id ? getCartRow(id) : null;
+  if (row && row.status === "open") setCartChannel(id, actor);
+  res.json({ actor });
+});
+
 app.get("/api/cart", (req, res) => {
+  const actor = readActor(req);
   const id = readCookie(req, "cart_id");
   const row = id ? getCartRow(id) : null;
   if (!row || row.status !== "open") {
-    return res.json({ id: null, channel: "human", status: "open", count: 0, sticker_total: 0, offers: offerForLines([]), items: [] });
+    return res.json({ id: null, channel: actor, status: "open", count: 0, sticker_total: 0, offers: offerForLines([]), items: [] });
   }
+  if (row.channel !== actor) setCartChannel(id, actor);
   res.json(getCart(id));
 });
 
 app.post("/api/carts", (req, res) => {
-  const channel = req.body?.channel === "agent" ? "agent" : "human";
+  const actor = readActor(req);
+  const requested = req.body?.channel === "agent" ? "agent" : "human";
+  const channel = actor === "agent" ? "agent" : requested;
   const cart = createCart(channel);
-  if (channel === "human") setCartCookie(res, cart.id);
+  if (channel === "human" || actor === "agent") setCartCookie(res, cart.id);
   res.status(201).json(cart);
 });
 
@@ -169,6 +198,7 @@ app.post("/api/chat", async (req, res) => {
       apiBase: req.body?.api_base,
       model: req.body?.model,
       cartId: readCookie(req, "cart_id"),
+      actor: readActor(req),
       messages: req.body?.messages,
     });
     if (result.ordered) clearCartCookie(res);
@@ -184,7 +214,7 @@ app.post("/api/chat", async (req, res) => {
 
 app.post("/api/carts/:id/checkout", (req, res) => {
   try {
-    const order = checkout(req.params.id, undefined, req.body?.product_ids);
+    const order = checkout(req.params.id, readActor(req) === "agent" ? "agent" : undefined, req.body?.product_ids);
     const remaining = getCart(req.params.id);
     if (readCookie(req, "cart_id") === req.params.id && (!remaining || remaining.status === "ordered" || !remaining.items.length)) {
       clearCartCookie(res);

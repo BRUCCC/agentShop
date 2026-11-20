@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, formatMoney } from "../api";
+import { useActor } from "../actor";
 
 export default function Cart() {
+  const actor = useActor();
   const [cart, setCart] = useState(null);
   const [selected, setSelected] = useState([]);
   const [quote, setQuote] = useState(null);
@@ -28,7 +30,7 @@ export default function Cart() {
     api("/api/quotes", {
       method: "POST",
       body: JSON.stringify({
-        channel: "human",
+        channel: actor,
         items: items.map((item) => ({ product_id: item.product_id, quantity: item.quantity })),
       }),
     })
@@ -41,7 +43,7 @@ export default function Cart() {
     return () => {
       cancel = true;
     };
-  }, [cart, selected]);
+  }, [cart, selected, actor]);
 
   async function update(productId, quantity) {
     setError("");

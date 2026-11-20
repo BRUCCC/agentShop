@@ -54,6 +54,15 @@ test("购物车提示用同一套门槛", () => {
   assert.equal(reached.agent_extra, 45);
 });
 
+test("页内渠道没有 95 折，外部渠道有", () => {
+  const lines = [{ product_id: "P001", name: "Aero 無線藍牙耳機", quantity: 1, unit_price: 1890 }];
+  const human = priceOrder(lines, "human");
+  const agent = priceOrder(lines, "agent");
+  assert.equal(human.total, 1790);
+  assert.equal(agent.total, 1701);
+  assert.ok(agent.total < human.total);
+});
+
 test("同一组商品，agent 应付不超过 human", () => {
   for (const price of [0, 100, 989, 990, 999, 1000, 1040, 1890]) {
     assert.ok(order(price, 1, "agent").total <= order(price, 1, "human").total);

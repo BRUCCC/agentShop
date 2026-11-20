@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, Route, Routes, useNavigate } from "react-router-dom";
+import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { api } from "./api";
+import { ActorContext, syncActor } from "./actor";
 import ProductList from "./pages/ProductList";
 import ProductDetail from "./pages/ProductDetail";
 import Cart from "./pages/Cart";
@@ -9,13 +10,19 @@ import ChatSidebar from "./sidebar/ChatSidebar";
 
 export default function App() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [cartCount, setCartCount] = useState(0);
   const [query, setQuery] = useState("");
+  const [actor, setActor] = useState("human");
   const [chatOpen, setChatOpen] = useState(() => window.matchMedia("(min-width: 901px)").matches);
 
   useEffect(() => {
+    syncActor().then(setActor).catch(() => setActor("human"));
+  }, [location.search]);
+
+  useEffect(() => {
     api("/api/cart").then((cart) => setCartCount(cart.count || 0)).catch(() => setCartCount(0));
-  }, []);
+  }, [actor]);
 
   function onSearch(event) {
     event.preventDefault();
@@ -50,8 +57,12 @@ export default function App() {
           </button>
         </div>
       </header>
+      {actor === "agent" ? (
+        <p className="actor-banner">当前是 AI 下单。满减后再享 95 折，运费不参加。普通访问没有这层优惠。</p>
+      ) : null}
       <div className="shell">
         <main className="main">
+          <ActorContext.Provider value={actor}>
           <Routes>
             <Route path="/" element={<ProductList />} />
             <Route path="/products/:id" element={<ProductDetail />} />
@@ -59,8 +70,9 @@ export default function App() {
             <Route path="/checkout" element={<Checkout />} />
             <Route path="/checkout/:token" element={<Checkout />} />
           </Routes>
+          </ActorContext.Provider>
         </main>
-        <ChatSidebar open={chatOpen} />
+        <ChatSidebar open={chatOpen} actor={actor} />
       </div>
       <footer className="footer">标价来自商品目录。优惠和运费只出现在报价和确认页。</footer>
     </div>

@@ -5,6 +5,7 @@ const {
   getCartRow,
   createCart,
   setItem,
+  setCartChannel,
   quoteProducts,
   createHandoff,
   checkout,
@@ -86,9 +87,15 @@ function wantsOrder(text) {
   return ORDER_PHRASES.some((phrase) => text.includes(phrase));
 }
 
+function pageChannel(state) {
+  return state.actor === "agent" ? "agent" : "human";
+}
+
 function ensureOpenCart(state) {
+  const channel = pageChannel(state);
   const row = state.cartId ? getCartRow(state.cartId) : null;
-  if (!row || row.status !== "open") state.cartId = createCart("human").id;
+  if (!row || row.status !== "open") state.cartId = createCart(channel).id;
+  else if (row.channel !== channel) setCartChannel(state.cartId, channel);
   return state.cartId;
 }
 
@@ -120,7 +127,7 @@ function runTool(name, args, state, userText) {
   }
   if (name === "quote") {
     try {
-      return quoteProducts(args.channel || "agent", args.items);
+      return quoteProducts(pageChannel(state), args.items);
     } catch (error) {
       return toolError(error);
     }
@@ -140,7 +147,7 @@ function runTool(name, args, state, userText) {
   }
   if (name === "create_handoff") {
     try {
-      const handoff = createHandoff(ensureOpenCart(state), "agent");
+      const handoff = createHandoff(ensureOpenCart(state), pageChannel(state));
       state.changed = true;
       return handoff;
     } catch (error) {
@@ -152,7 +159,7 @@ function runTool(name, args, state, userText) {
       return toolError({ code: "VALIDATION", message: "用户没有明确要求下单，不能下单" });
     }
     try {
-      const order = checkout(ensureOpenCart(state), "agent");
+      const order = checkout(ensureOpenCart(state), pageChannel(state));
       state.changed = true;
       state.ordered = true;
       return order;
@@ -235,15 +242,18 @@ function hideKey(text, apiKey) {
   return text.split(apiKey).join("［已隐藏］");
 }
 
-async function chat({ apiKey, apiBase, model, cartId, messages }) {
+async function chat({ apiKey, apiBase, model, cartId, actor, messages }) {
   if (!apiKey || !String(apiKey).trim()) fail(400, "MODEL_UNAVAILABLE", "没有填写 API key，不能调用模型");
   if (!apiBase || !String(apiBase).trim() || !model || !String(model).trim()) {
     fail(400, "MODEL_UNAVAILABLE", "没有填写模型地址或模型名称");
   }
   const url = endpointFor(String(apiBase).trim());
   const userText = latestUserText(messages);
-  const state = { cartId: cartId || null, changed: false, ordered: false };
-  const transcript = [{ role: "system", content: SYSTEM_PROMPT }, ...normalizeMessages(messages)];
+  const state = { cartId: cartId || null, actor: actor === "agent" ? "agent" : "human", changed: false, ordered: false };
+  const prompt = state.actor === "agent"
+    ? `${SYSTEM_PROMPT}\n\n这一次浏览器带有 AI 下单标识。报价、交接和下单按 agent 渠道，满减后有 95 折。`
+    : SYSTEM_PROMPT;
+  const transcript = [{ role: "system", content: prompt }, ...normalizeMessages(messages)];
   const spent = emptyUsage();
 
   let reply = "";

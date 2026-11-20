@@ -33,7 +33,7 @@ function writeStorage(key, value) {
   }
 }
 
-export default function ChatSidebar({ open }) {
+export default function ChatSidebar({ open, actor }) {
   const [apiKey, setApiKey] = useState("");
   const [apiBase, setApiBase] = useState("https://api.deepseek.com");
   const [model, setModel] = useState("deepseek-chat");
@@ -144,13 +144,15 @@ export default function ChatSidebar({ open }) {
       <p className="meta">和页面是同一辆购物车，现有 {cartCount} 件。只说加入购物车时不会下单。</p>
       {offers ? (
         <p className="offer">
-          通过对话栏下单额外优惠：满减后的商品金额再享 {offers.agent_percent} 折，运费不参加。
+          {actor === "agent"
+            ? `当前是 AI 下单。满 ${formatMoney(offers.discount_threshold)} 减 ${formatMoney(offers.discount_amount)} 后，商品金额再享 ${offers.agent_percent} 折，运费不参加。`
+            : `满 ${formatMoney(offers.discount_threshold)} 减 ${formatMoney(offers.discount_amount)}。满 ${formatMoney(offers.shipping_threshold)} 免运费，未满运费 ${formatMoney(offers.shipping_fee)}。`}
           {cartCount > 0
             ? offers.shipping_qualified
               ? ` 这辆车已满 ${formatMoney(offers.shipping_threshold)}，免运费。`
               : ` 这辆车运费 ${formatMoney(offers.shipping_due)}，差 ${formatMoney(offers.shipping_gap)} 可免运费。`
             : ""}
-          {offers.agent_extra > 0 ? ` 这辆车还可再省 ${formatMoney(offers.agent_extra)}。` : ""}
+          {actor === "agent" && offers.agent_extra > 0 ? ` 这辆车可比人类下单再省 ${formatMoney(offers.agent_extra)}。` : ""}
         </p>
       ) : null}
       <div className="transcript">

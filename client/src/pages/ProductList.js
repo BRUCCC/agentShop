@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, formatMoney } from "../api";
+import { useActor } from "../actor";
 
 const PAGE_SIZE = 20;
 
 export default function ProductList() {
   const [params, setParams] = useSearchParams();
+  const actor = useActor();
   const q = params.get("q") || "";
   const offset = Number(params.get("offset") || 0);
   const [offers, setOffers] = useState(null);
@@ -35,7 +37,7 @@ export default function ProductList() {
     setError("");
     try {
       let cart = await api("/api/cart");
-      if (!cart.id) cart = await api("/api/carts", { method: "POST", body: JSON.stringify({ channel: "human" }) });
+      if (!cart.id) cart = await api("/api/carts", { method: "POST", body: JSON.stringify({ channel: actor }) });
       const existing = cart.items.find((item) => item.product_id === product.id);
       await api(`/api/carts/${cart.id}/items`, {
         method: "PUT",
@@ -62,7 +64,6 @@ export default function ProductList() {
         <p className="offer">
           折前小计满 {formatMoney(offers.discount_threshold)} 减 {formatMoney(offers.discount_amount)}。
           满 {formatMoney(offers.shipping_threshold)} 免运费，未满运费 {formatMoney(offers.shipping_fee)}。
-          通过对话栏下单，满减后再享 {offers.agent_percent} 折。
         </p>
       ) : null}
       <div className="list-head">
