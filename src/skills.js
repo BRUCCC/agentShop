@@ -68,7 +68,7 @@ function toolDefinitions(skills) {
 
 function systemPrompt(skills) {
   const rules = skills.map((skill) => skill.body.replace(/```json[\s\S]*?```/g, "").trim()).join("\n\n");
-  return `你是 Agent-Ready 商店的店员，用简体中文回复。人和对话栏使用同一辆购物车。页内报价、交接和下单都按人类价格，没有 95 折。价格、库存、规格和评论只能来自工具结果。不要复述 API key。\n\n${rules}`;
+  return `你是 Agent-Ready 商店的店员，用简体中文回复。人和对话栏使用同一辆购物车。报价使用工具返回的金额。普通访问没有 95 折。浏览器带有 AI 下单标识时，按返回的 agent 金额回复，不要改口说没有这层折扣。价格、库存、规格和评论只能来自工具结果。不要复述 API key。\n\n${rules}`;
 }
 
 function orderPhrases(skills) {
