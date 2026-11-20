@@ -45,10 +45,10 @@ npm test
 | 给 agent 的 context、实现前的规格和任务 | `AGENTS.md`、`SPEC.md`、`PLAN.md`、`TASKS.md` |
 | 协作过程、失败和修正 | `AI_WORKFLOW.md`。过程素材在 `AI_NOTES.md` |
 | 价格只有一份，Actions 会跑 | `src/domain/pricing.js`、`.github/workflows/test.yml` |
+| 真实 agent 购物纪录 | `docs/agent-shopping-log.md` |
 
 方案和接口细节在 `技术方案.md`、`技术方案_v2.md`、`前端技术方案.md`、`后端技术方案.md`、`agent技术方案.md`。
 
 ## 还要补上
 
-- 工时按实际填写。题目要求收到后 72 小时内缴交，第一题和加分题合计不超过 16 小时。加分题这次不做。记录从 2026-11-13 的方案开始，到 2026-11-20 的本机 AI 下单和 Actions。具体小时数留空，不估。
 - 仓库保持私人，邀请题目邮件里的账号，并回复该邮件附上链接。提交历史不要 squash。
