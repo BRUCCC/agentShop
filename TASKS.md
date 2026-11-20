@@ -50,8 +50,8 @@
 
 ## 提交材料
 
-- [ ] `README.md` 写清启动和测试
-- [ ] `skills/shared-pricing/SKILL.md` 写完，并记下用了几次、改过几版
-- [ ] `docs/agent-shopping-log.md` 放上真实购物记录，或在 README 指向录像
-- [ ] `AI_NOTES.md` 写成 3 到 5 则
+- [x] `README.md` 写清启动、测试，以及 agent 怎么连
+- [x] `DECISIONS.md` 写完调整、照做和有疑问的条目。v0.2 在 `DECISIONS_V2.md`
+- [x] `AI_WORKFLOW.md` 写清分工、harness，以及 3 到 5 个失败和修正
+- [ ] 工时按实际填写。仓库保持私人并邀请指定账号
 - [ ] 提交历史保持完整，不 squash
