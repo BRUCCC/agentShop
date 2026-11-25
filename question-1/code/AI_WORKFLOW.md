@@ -18,7 +18,7 @@
 
 - `AGENTS.md` 规定实现顺序、价格只有一份、加购不下单、不建 MCP。
 - `src/domain/pricing.js` 是唯一的价格实现。网页和接口都不能另写一套。
-- `.github/workflows/test.yml` 会启动 `npm start`，再由 `scripts/verify-pricing.js` 核对报价。公式被改错时，推送过不了。
+- 仓库根目录的 `.github/workflows/test.yml` 会在 `question-1/code` 里启动 `npm start`，再由 `scripts/verify-pricing.js` 核对报价。公式被改错时，推送过不了。GitHub 只读取仓库根目录的 workflow。
 - `skills/shop-quote/SKILL.md` 约束对话栏怎么解释应付金额。服务启动时读进系统提示，模型不能另算价格。
 
 选这一个 skill，是因为报价说明会原样进入对话。它如果写成「页内一律没有 95 折」，店员会否定页面上已经按 AI 下单算出的应付金额。价格公式本身仍只在 `pricing.js`。

@@ -1,5 +1,7 @@
 # 项目沟通记录
 
+> 当前文件名是 `RAW_SESSION.md`。购物纪录在 `AGENT_SHOPPING_LOG.md`。正文里的 `docs/session.md` 和 `docs/agent-shopping-log.md` 是移动前的路径。
+
 这是本项目这一次对话里和商店开发有关的来回文字。推送到 GitHub 的排错、系统通知、工具调用和密钥没有放进来。
 
 来源会话：ab6ace12-269a-4032-aa95-e34524fab570

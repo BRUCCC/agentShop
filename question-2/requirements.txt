@@ -1,0 +1,3 @@
+pymilvus==3.0.3
+milvus-lite==3.2.2
+jieba==0.42.1

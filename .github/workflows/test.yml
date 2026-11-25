@@ -8,12 +8,16 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: question-1/code
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: question-1/code/package-lock.json
       - name: 安装依赖
         run: npm ci
       - name: 运行单元测试
